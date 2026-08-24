@@ -1,0 +1,48 @@
+# ===== 認証情報・シークレット（最優先） =====
+.clasprc.json
+.clasp.json
+*.clasprc.json
+client_secret*.json
+service-account*.json
+*credentials*.json
+*-key.json
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+token.json
+
+# ===== 実データ・題材文書（匿名化前のものを含めない） =====
+data/raw/
+data/private/
+**/real_data/
+*.xlsx
+*.csv
+!**/samples/*.csv
+!**/fixtures/*.csv
+
+# ===== Node / GAS =====
+node_modules/
+npm-debug.log*
+.DS_Store
+
+# ===== Python =====
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ===== RAG 成果物（再生成可能・巨大） =====
+**/storage/
+**/index/
+**/.chroma/
+**/vector_store/
+*.faiss
+
+# ===== その他 =====
+.idea/
+.vscode/
+tmp/
