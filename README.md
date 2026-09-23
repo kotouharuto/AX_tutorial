@@ -7,6 +7,7 @@ Phase B（事業化：契約・集客・価格・営業）は**対象外**。
 
 | 見たいもの | ファイル |
 |---|---|
+| **Phase A で何をやり、何が分かったか** | **[docs/phase-a-summary.md](docs/phase-a-summary.md)** |
 | 全体方針・ブロック構成 | [docs/00-roadmap.md](docs/00-roadmap.md) |
 | いまどこまで進んだか | [docs/progress.md](docs/progress.md) |
 | 次に何をどう進めるか | [docs/process/](docs/process/) |
@@ -18,17 +19,17 @@ Phase B（事業化：契約・集客・価格・営業）は**対象外**。
 
 | # | ブロック | 目的 | 目安 | 状態 |
 |---|---|---|---|---|
-| A-1 | [GAS と業務システム接続](docs/process/10-A1-gas.md) | 成果物を実際の業務に着地させる | 2〜3週 | 着手中 |
-| A-2 | [RAG と評価設計](docs/process/20-A2-rag.md) | 「情報が散らばっている」問題に応える | 2〜4週 | 未着手 |
-| A-3 | [他人が使い続ける形にする](docs/process/30-A3-handover.md) | 引き渡し後に動き続ける設計 | 2〜3週 | 未着手 |
+| A-1 | [GAS と業務システム接続](docs/process/10-A1-gas.md) | 成果物を実際の業務に着地させる | 2〜3週 | **完了 7/7** |
+| A-2 | [RAG と評価設計](docs/process/20-A2-rag.md) | 「情報が散らばっている」問題に応える | 2〜4週 | **完了 6/6** |
+| A-3 | [他人が使い続ける形にする](docs/process/30-A3-handover.md) | 引き渡し後に動き続ける設計 | 2〜3週 | **5/6**（条件6は協力者不在で未達） |
 
 **期間ではなく到達条件で管理する。** 目安期間は締切ではなく、大きく超えたときに
 深入りを疑うための基準。
 
 ## 現在地
 
-A-1 の環境構築段階。`clasp` が PATH 上で動く状態にするところから。
-→ [docs/process/10-A1-gas.md](docs/process/10-A1-gas.md) のステップ①
+**Phase A 区切り**（2026-09-23）。実作業 約25時間、ハマりポイント 27件。
+→ [docs/phase-a-summary.md](docs/phase-a-summary.md)
 
 ## 運用の約束
 
