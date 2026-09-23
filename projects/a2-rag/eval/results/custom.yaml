@@ -1,0 +1,135 @@
+method: custom_baseline
+date: 2026-09-01
+note: |
+  自作RAG（chunk=512 / overlap=50 / ベクトル検索 / e5-small / top_k=5）。
+  埋め込みはローカル実行。**文書を一切外部に出していない。**
+
+  **画像PDF 2件は検索対象にすら入っていない**（OCR を入れていないため）。
+  失点2問はどちらもその2件にしか答えがない問題で、それ以外は全問正答。
+
+  自動判定（26.0/29・判定不能1）と手動採点（28.0/30）にズレがあった。
+  数値照合では意味を判定できず、特に Q17 は expected に誤答例を書いていたため
+  誤答の『90日』がマッチしてしまった。**自動判定は検算なしに使えない。**
+
+# score: 1 / 0.5 / 0
+answers:
+  - id: Q09          # [01]
+    answer: "入社1年以上＋免許3年以上、安全運転講習の受講"
+    score: 1
+    note: ""
+  - id: Q08          # [02]
+    answer: "5回でロック。自動解除なし"
+    score: 1
+    note: ""
+  - id: Q03          # [03]
+    answer: "2台"
+    score: 1
+    note: ""
+  - id: Q28          # [04]
+    answer: "文書に記載がありません"
+    score: 1
+    note: "none 正解"
+  - id: Q14          # [05]
+    answer: "2025年版は翌月5日／2023年版は翌月10日と両方提示"
+    score: 1
+    note: ""
+  - id: Q16          # [06]
+    answer: "状況別に4400(IT-102)と IT-103 の切り分けを併記"
+    score: 1
+    note: "複数窓口を提示できている。ただし記録を300字で切ったため『矛盾』と明示したかは未確認"
+  - id: Q04          # [07]
+    answer: "年5日分まで"
+    score: 1
+    note: ""
+  - id: Q12          # [08]
+    answer: "文書に記載がありません"
+    score: 0
+    note: "**画像PDF(SCN-601)が検索対象外のため構造的に不可。ただし推測せず正直に答えた**"
+  - id: Q07          # [09]
+    answer: "12文字以上"
+    score: 1
+    note: ""
+  - id: Q21          # [10]
+    answer: "15,000円。旧規程12,000円にも言及"
+    score: 1
+    note: ""
+  - id: Q29          # [11]
+    answer: "文書に記載がありません"
+    score: 1
+    note: "none 正解"
+  - id: Q02          # [12]
+    answer: "5営業日"
+    score: 1
+    note: ""
+  - id: Q23          # [13]
+    answer: "取締役会"
+    score: 1
+    note: "**自動判定は『数値なし』で判定不能。手動で 1.0**"
+  - id: Q30          # [14]
+    answer: "文書に記載がありません"
+    score: 1
+    note: "none 正解"
+  - id: Q05          # [15]
+    answer: "20日"
+    score: 1
+    note: ""
+  - id: Q19          # [16]
+    answer: "所属長および総務部。10万円以上のため経理部と事前協議"
+    score: 1
+    note: "**自動判定 0.5 は誤り。expected と完全一致しており 1.0**"
+  - id: Q13          # [17]
+    answer: "首都圏15,000円／その他12,000円。2025年版を最新として提示"
+    score: 1
+    note: ""
+  - id: Q06          # [18]
+    answer: "7日前まで"
+    score: 1
+    note: ""
+  - id: Q11          # [19]
+    answer: "10万円以上"
+    score: 1
+    note: ""
+  - id: Q20          # [20]
+    answer: "ネットワーク管理課(内線4455)"
+    score: 1
+    note: ""
+  - id: Q25          # [21]
+    answer: "8,000円。事前承認必須"
+    score: 1
+    note: ""
+  - id: Q10          # [22]
+    answer: "3営業日以内"
+    score: 1
+    note: ""
+  - id: Q18          # [23]
+    answer: "月額3,000円（2025年10月支給分より）"
+    score: 1
+    note: "自動判定 0.5 は誤り。主要部分は正答"
+  - id: Q22          # [24]
+    answer: "5,000円"
+    score: 1
+    note: "結合セルを正しく解釈"
+  - id: Q24          # [25]
+    answer: "3週間"
+    score: 1
+    note: ""
+  - id: Q17          # [26]
+    answer: "90日"
+    score: 0
+    note: "**誤答。正解は60日。画像PDF(SCN-602)が読めず、古い IT-110 の記載をそのまま答えた。自動判定は 0.5 としたが、expected に誤答例『90日と記載が残っている』を書いていたため数値がマッチしただけ**"
+  - id: Q27          # [27]
+    answer: "文書に記載がありません"
+    score: 1
+    note: "none 正解"
+  - id: Q01          # [28]
+    answer: "月3回を超えると制限"
+    score: 1
+    note: ""
+  - id: Q15          # [29]
+    answer: "週3日"
+    score: 1
+    note: "自動判定 0.5 は誤り。旧版への言及は detects で求めていない"
+  - id: Q26          # [30]
+    answer: "文書に記載がありません"
+    score: 1
+    note: "none 正解"

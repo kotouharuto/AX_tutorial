@@ -1,0 +1,253 @@
+{
+  "name": "A3 問い合わせ振り分け v2（冪等性・順序修正）",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1VO1-M3cbNPLf0J4O3sYnx_Id3lxNUGMUb1Brd5Xj2G8"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Form_Responses"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "name": "フォーム回答トリガー",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "A-1 の onFormSubmit に相当。ただし GAS はイベント駆動、n8n はポーリング（最短1分）。この差は境界の1つ。"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "skip-processed",
+              "leftValue": "={{ $json['状態'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "未処理のみ",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        300
+      ],
+      "notes": "状態列が空の行だけ通す。A-1 の「処理済みならスキップ」に相当。Gemini の前に置くことで、再実行時に API を無駄に叩かず、メールも再送しない。"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: '以下の社内問い合わせを分類してください。\\n分類は次のいずれか1つ：システム障害 / 申請手続き / 備品・設備 / その他\\n緊急度は次のいずれか1つ：高 / 中 / 低\\n出力は JSON のみ。前置き・説明・コードフェンスを一切含めないこと。\\n形式：{\"category\": \"...\", \"urgency\": \"...\", \"reason\": \"30字以内の判断理由\"}\\n\\n--- 問い合わせ ---\\n' + $(\"フォーム回答トリガー\").first().json[\"問い合わせ内容\"] }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } }) }}",
+        "options": {}
+      },
+      "name": "Gemini分類",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ],
+      "notes": "A-1 と同じエンドポイント・同じプロンプト。API キーは Header Auth クレデンシャル（x-goog-api-key）。"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1VO1-M3cbNPLf0J4O3sYnx_Id3lxNUGMUb1Brd5Xj2G8"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "担当マスタ"
+        },
+        "options": {}
+      },
+      "name": "担当マスタ",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        300
+      ],
+      "notes": "業務ルールはシートに置く（A-1 と同じ設計）。executeOnce=true で参照データとして1回だけ読む。",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// A-1 の Classifier.js + Routing.js に相当する処理。\n// n8n の Code ノードは JS のみ。GAS と同じ言語なので移植は直訳に近い。\n\nconst CATEGORIES = ['システム障害', '申請手続き', '備品・設備', 'その他'];\nconst URGENCIES = ['高', '中', '低'];\n\n// --- Gemini 応答のパース（3段フォールバック） ---\nconst resp = $('Gemini分類').first().json;\nlet raw = resp?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';\nif (!raw) {\n  throw new Error('Gemini の応答に本文がありません: ' + JSON.stringify(resp).slice(0, 300));\n}\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e1) {\n  const unfenced = raw.replace(/^\\s*```(?:json)?\\s*/i, '').replace(/\\s*```\\s*$/, '');\n  try {\n    parsed = JSON.parse(unfenced);\n  } catch (e2) {\n    const s = unfenced.indexOf('{'), t = unfenced.lastIndexOf('}');\n    if (s === -1 || t <= s) throw new Error('分類結果を JSON として解釈できません: ' + raw.slice(0, 200));\n    parsed = JSON.parse(unfenced.slice(s, t + 1));\n  }\n}\n\n// --- 値の検証（モデルは定義外の値を平気で返す） ---\nconst category = String(parsed?.category ?? '').trim();\nconst urgency = String(parsed?.urgency ?? '').trim();\nif (!CATEGORIES.includes(category)) throw new Error('分類が定義外です: ' + category);\nif (!URGENCIES.includes(urgency)) throw new Error('緊急度が定義外です: ' + urgency);\n\n// --- 担当マスタから宛先を解決 ---\nconst routing = $('担当マスタ').all().map(i => i.json);\nconst isEmail = v => /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(v);\nconst clean = v => String(v ?? '').replace(/[\\s\\u3000]/g, '');\n\nconst hit = routing.find(r => String(r['分類'] ?? '').trim() === category);\nlet to = hit ? clean(hit['担当者メールアドレス']) : '';\nlet isFallback = false;\n\nif (!isEmail(to)) {\n  // A-1 では PropertiesService の FALLBACK_TO を使った。\n  // n8n では担当マスタの「その他」行をフォールバックにする（設定をシートに集約する設計）。\n  const fb = routing.find(r => String(r['分類'] ?? '').trim() === 'その他');\n  to = fb ? clean(fb['担当者メールアドレス']) : '';\n  isFallback = true;\n  if (!isEmail(to)) throw new Error('分類「' + category + '」の担当者も、フォールバック（その他）も未設定です。');\n}\n\n// --- 元の問い合わせ ---\nconst src = $('フォーム回答トリガー').first().json;\n\nreturn [{\n  json: {\n    rowNumber: src.row_number,\n    name: String(src['お名前'] ?? '').trim(),\n    email: String(src['メールアドレス'] ?? '').trim(),\n    body: String(src['問い合わせ内容'] ?? '').trim(),\n    category,\n    urgency,\n    reason: String(parsed?.reason ?? '').trim(),\n    to,\n    status: isFallback ? '未分類' : '完了',\n    detail: isFallback ? '担当者未設定のためフォールバック送信。判断理由: ' + (parsed?.reason ?? '') : String(parsed?.reason ?? ''),\n  },\n}];"
+      },
+      "name": "パース・検証・宛先解決",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "=[問い合わせ/{{ $json.category }}/緊急度{{ $json.urgency }}] {{ $json.name }} 様",
+        "emailType": "text",
+        "message": "=分類: {{ $json.category }}（緊急度: {{ $json.urgency }}）\n判断理由: {{ $json.reason }}\n\nお名前: {{ $json.name }}\n返信先: {{ $json.email }}\n\n--- 問い合わせ内容 ---\n{{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "振り分けメール",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1VO1-M3cbNPLf0J4O3sYnx_Id3lxNUGMUb1Brd5Xj2G8"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Form_Responses"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "タイムスタンプ": "={{ $('フォーム回答トリガー').first().json['タイムスタンプ'] }}",
+            "分類": "={{ $('パース・検証・宛先解決').first().json.category }}",
+            "緊急度": "={{ $('パース・検証・宛先解決').first().json.urgency }}",
+            "担当者": "={{ $('パース・検証・宛先解決').first().json.to }}",
+            "状態": "={{ $('パース・検証・宛先解決').first().json.status }}",
+            "詳細": "={{ $('パース・検証・宛先解決').first().json.detail }}"
+          },
+          "matchingColumns": [
+            "タイムスタンプ"
+          ]
+        },
+        "options": {}
+      },
+      "name": "シートに記録",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1560,
+        300
+      ],
+      "notes": "照合キーはタイムスタンプ。トリガー出力に row_number が無いため（GAS では e.range.getRow() で取れた）。同一秒の2件は誤更新しうる。"
+    }
+  ],
+  "connections": {
+    "フォーム回答トリガー": {
+      "main": [
+        [
+          {
+            "node": "未処理のみ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "未処理のみ": {
+      "main": [
+        [
+          {
+            "node": "Gemini分類",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini分類": {
+      "main": [
+        [
+          {
+            "node": "担当マスタ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "担当マスタ": {
+      "main": [
+        [
+          {
+            "node": "パース・検証・宛先解決",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "パース・検証・宛先解決": {
+      "main": [
+        [
+          {
+            "node": "振り分けメール",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "振り分けメール": {
+      "main": [
+        [
+          {
+            "node": "シートに記録",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

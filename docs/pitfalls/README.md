@@ -21,4 +21,30 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 
 | ID | ブロック | 事象 | 一般性 |
 |---|---|---|---|
-| _まだ記録なし_ | | | |
+| [a1-clasp-nodenv-rehash](a1-clasp-nodenv-rehash.md) | A-1 | nodenv で `npm install -g` 直後に command not found | shim を使う環境全般 |
+| [a1-clasp-rootdir-duplication](a1-clasp-rootdir-duplication.md) | A-1 | `--rootDir` 二重適用で `src/src/` に生成される | clasp 3.4.0 |
+| [a1-clasp-push-silent-skip](a1-clasp-push-silent-skip.md) | A-1 | 非対話シェルで `clasp push` が黙ってスキップされる | どの環境でも |
+| [a1-gas-default-timezone](a1-gas-default-timezone.md) | A-1 | 生成される `timeZone` が America/New_York | どの環境でも |
+| [a1-clasp-logs-need-gcp-project](a1-clasp-logs-need-gcp-project.md) | A-1 | `clasp tail-logs` が GCP プロジェクト未設定で使えない | どの環境でも |
+| [a1-gas-approved-but-nothing-happens](a1-gas-approved-but-nothing-happens.md) | A-1 | OAuth 承認は通るのに何も起きない（関数の既定選択 × 設定不足） | どの環境でも |
+| [a1-gemini-free-tier-data-use](a1-gemini-free-tier-data-use.md) | A-1 | Gemini 無料枠は送信内容が学習・人間レビューの対象 | どの環境でも |
+| [a1-gas-mailapp-vs-gmailapp-scope](a1-gas-mailapp-vs-gmailapp-scope.md) | A-1 | MailApp と GmailApp はスコープが別。診断の1行で権限が増える | どの環境でも |
+| [a1-gemini-model-name-rot](a1-gemini-model-name-rot.md) | A-1 | ハードコードしたモデル名が提供終了で 404 になる | どの環境でも |
+| [a1-gas-trigger-concurrency](a1-gas-trigger-concurrency.md) | A-1 | トリガー多重起動で二重処理（フラグ列だけでは防げない） | どの環境でも |
+| [a1-gas-6min-execution-limit](a1-gas-6min-execution-limit.md) | A-1 | 実行時間6分制限（実測 約87件で打ち切り）と分割実行 | どの環境でも |
+| [a1-external-api-retry-design](a1-external-api-retry-design.md) | A-1 | リトライ設計。本体は「再試行しない条件」の方 | どの環境でも |
+| [a1-gas-consent-screen-is-not-read](a1-gas-consent-screen-is-not-read.md) | A-1 | 承認画面は読まれない。権限説明を画面に依存できない | どの環境でも |
+| [a1-gas-granular-consent](a1-gas-granular-consent.md) | A-1 | 権限は個別に拒否できる。部分承認で「承認したのに動かない」 | どの環境でも |
+| [a1-gas-trigger-cannot-be-transferred](a1-gas-trigger-cannot-be-transferred.md) | A-1 | トリガーは移管不可。所有権を移しても作成者で動く（未検証） | どの環境でも |
+| [a2-evaluator-was-wrong](a2-evaluator-was-wrong.md) | A-2 | 評価する側の正解が誤っていた／意図しない汚れの混入 | どの環境でも |
+| [a2-apple-silicon-x86-python](a2-apple-silicon-x86-python.md) | A-2 | Apple Silicon で x86_64 Python が選ばれ arm64 wheel が入らない | Intel 版 Homebrew が残る macOS |
+| [a2-auto-scoring-cannot-be-trusted](a2-auto-scoring-cannot-be-trusted.md) | A-2 | 自動採点が誤答を正解と判定（期待値に誤答例を書いていた） | どの環境でも |
+| [a2-privileged-port-check](a2-privileged-port-check.md) | A-2 | lsof でのポート確認は特権ポートを見落とす | どの環境でも |
+| [a2-dify-default-chunking](a2-dify-default-chunking.md) | A-2 | Dify 既定チャンクは改行ごと。見出し・日付・表構造が本文から分離 | Dify 既定設定 |
+| [a2-dify-chatflow-context-not-injected](a2-dify-chatflow-context-not-injected.md) | A-2 | チャットフローで引用は出るが回答に反映されない（{{#context#}} 手動挿入） | Dify チャットフロー |
+| [a2-dify-selfhost-setup](a2-dify-selfhost-setup.md) | A-2 | Dify セルフホスト構築の落とし穴8件（Cloud混同・更新失敗・非推奨既定 等） | Dify セルフホスト |
+| [a3-n8n-google-oauth-setup](a3-n8n-google-oauth-setup.md) | A-3 | n8n から Google を使う OAuth 設定。GAS で不要だった6手順と詰まり4箇所 | 外部ツール全般 |
+| [a3-n8n-workflow-model](a3-n8n-workflow-model.md) | A-3 | n8n の処理モデルで踏んだ8件（アイテム展開・.first()・row_number 非対称 等） | ノードベースツール全般 |
+| [a3-knowledge-curation-beats-instructions](a3-knowledge-curation-beats-instructions.md) | A-3 | 「外す」と決めた文書が投入されていた。ナレッジ管理は指示書に優先する | RAG・Project 全般 |
+| [a3-error-detection-gas-vs-n8n](a3-error-detection-gas-vs-n8n.md) | A-3 | エラー検知の比較。Error Workflow はテストで動かない。setup 非冪等でフォーム増殖 | どの環境でも |
+| [a3-n8n-item-multiplication](a3-n8n-item-multiplication.md) | A-3 | 参照データを読むと以降が行数倍で実行される。業務ルールをシートに置けない | ノードベースツール全般 |

@@ -1,0 +1,26 @@
+# A-3 ステップ①：n8n セルフホスト
+#
+# A-1・A-2 で踏んだ落とし穴を反映している：
+#   - タイムゾーンを明示する（GAS の既定が America/New_York だった → 時間主導の処理がずれる）
+#   - bind mount ではなく named volume を使う（Dify で macOS の bind mount が deadlock を起こした）
+#   - ポートは既定 5678。Dify は 8080 を使っているので衝突しない
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: a3-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Tokyo
+      - TZ=Asia/Tokyo
+      # localhost を http で開くため。これを false にしないとログイン後の Cookie が保存されず、
+      # 「ログインしたのにログイン画面に戻る」という症状になる。
+      - N8N_SECURE_COOKIE=false
+      # 外部（Google OAuth）からのコールバック先。ローカル検証なので localhost。
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:

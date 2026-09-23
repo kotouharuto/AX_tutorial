@@ -1,0 +1,20 @@
+[project]
+name = "a2-rag"
+version = "0.1.0"
+description = "A-2: RAG と評価設計の検証プロジェクト"
+requires-python = ">=3.11"
+dependencies = [
+    # 題材文書の生成
+    "reportlab>=4.0",
+    "pillow>=10.0",
+    "pyyaml>=6.0",
+    # 自作RAG
+    "pypdf>=5.0",              # PDF のテキスト抽出（画像PDFは読めない＝それが自作の制約）
+    "sentence-transformers>=3.0",  # 埋め込み。ローカル実行で文書を外部に出さない
+    "rank-bm25>=0.2",          # ハイブリッド検索の語彙側
+    "numpy>=1.26",             # 60文書規模ならベクトルDBは不要
+    "requests>=2.31",          # Gemini API
+]
+
+[tool.ruff]
+line-length = 100

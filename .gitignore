@@ -35,6 +35,17 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
+# ===== Dify（外部リポジトリの clone。ここでは管理しない） =====
+projects/a2-rag/systems/dify/
+
+# ===== A-2 自作RAG の埋め込みキャッシュ（再生成可能） =====
+projects/a2-rag/systems/custom/cache/
+projects/a2-rag/systems/custom/results/
+
+# ===== A-2 生成物（generate.py で再生成可能・シード固定） =====
+projects/a2-rag/corpus/out/
+projects/a2-rag/corpus/out_long/
+
 # ===== RAG 成果物（再生成可能・巨大） =====
 **/storage/
 **/index/
