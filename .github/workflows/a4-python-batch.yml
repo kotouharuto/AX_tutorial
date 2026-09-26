@@ -1,0 +1,59 @@
+# A-4 の Windows 検証
+#
+# Windows 実機がないため、CI で windows-latest を使って確認する。
+# 確認できること：パス区切り、改行コード、cp932 の読み込み、openpyxl の挙動
+# 確認できないこと：Python 未導入の PC での配布・起動（ランナーには Python が入っているため）
+
+name: a4-python-batch
+
+on:
+  push:
+    paths:
+      - "projects/a4-python-batch/**"
+      - ".github/workflows/a4-python-batch.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: projects/a4-python-batch
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: 依存をインストール
+        run: uv sync --extra dev
+
+      # テストデータは .gitignore で除外しているため、CI でも生成スクリプトから作る。
+      # シード固定なので、どの OS でも同じデータになるはず。
+      - name: テストデータを生成
+        run: uv run python src/generate_testdata.py
+
+      - name: 生成データの文字コードを確認
+        run: uv run python -c "import sys; d=open('input/excel/SPR_2026-08.csv','rb').read(); sys.exit(0 if d.decode('cp932') else 1)"
+
+      - name: テスト
+        run: uv run pytest tests/ -v
+
+      - name: バッチを通しで実行
+        run: uv run python src/main.py
+
+      - name: 出力を確認
+        run: uv run python -c "from pathlib import Path; [print(p.name, p.stat().st_size) for p in sorted(Path('output').rglob('*')) if p.is_file()]"
+
+      - name: 失敗時に出力を回収
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-${{ matrix.os }}
+          path: projects/a4-python-batch/output/

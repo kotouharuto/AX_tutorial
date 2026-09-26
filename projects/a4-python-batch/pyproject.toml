@@ -1,0 +1,17 @@
+[project]
+name = "a4-python-batch"
+version = "0.1.0"
+description = "A-4: Python バッチ（Excel 結合・帳票出力・PDF 処理）"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "openpyxl>=3.1",      # xlsx の読み書き
+    "pypdf>=5.0",         # PDF 結合
+    "reportlab>=4.0",     # テストデータの PDF 生成
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.ruff]
+line-length = 100

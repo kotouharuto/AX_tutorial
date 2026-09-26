@@ -10,7 +10,8 @@ Phase B（事業化：契約・集客・価格・営業）は**対象外**。
 | **Phase A で何をやり、何が分かったか** | **[docs/phase-a-summary.md](docs/phase-a-summary.md)** |
 | **Phase B への引き継ぎ**（チャットに貼って使う） | **[docs/phase-b-handover.md](docs/phase-b-handover.md)** |
 | 全体方針・ブロック構成 | [docs/00-roadmap.md](docs/00-roadmap.md) |
-| いまどこまで進んだか | [docs/progress.md](docs/progress.md) |
+| いまどこまで進んだか（A-1〜A-3） | [docs/progress.md](docs/progress.md) |
+| いまどこまで進んだか（A-4〜A-6） | [docs/phase-a-plus/progress.md](docs/phase-a-plus/progress.md) |
 | 次に何をどう進めるか | [docs/process/](docs/process/) |
 | 踏んだ落とし穴 | [docs/pitfalls/README.md](docs/pitfalls/README.md) |
 | 何にどれだけ時間がかかったか | [docs/logs/](docs/logs/) |

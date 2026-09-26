@@ -48,3 +48,4 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 | [a3-knowledge-curation-beats-instructions](a3-knowledge-curation-beats-instructions.md) | A-3 | 「外す」と決めた文書が投入されていた。ナレッジ管理は指示書に優先する | RAG・Project 全般 |
 | [a3-error-detection-gas-vs-n8n](a3-error-detection-gas-vs-n8n.md) | A-3 | エラー検知の比較。Error Workflow はテストで動かない。setup 非冪等でフォーム増殖 | どの環境でも |
 | [a3-n8n-item-multiplication](a3-n8n-item-multiplication.md) | A-3 | 参照データを読むと以降が行数倍で実行される。業務ルールをシートに置けない | ノードベースツール全般 |
+| [a4-endpoint-protection-blocks-import](a4-endpoint-protection-blocks-import.md) | A-4 | エンドポイント保護のスキャンで新規パッケージの import が数十秒ブロックされる | EDR 導入端末すべて |
