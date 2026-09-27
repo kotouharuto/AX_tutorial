@@ -40,8 +40,11 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 - [x] 数式セルの読み込み挙動を観察し、記録した
       根拠：`data_only` なし=数式文字列 / あり=None / pandas=NaN。実際の値176はどれでも取れない
 - [x] Windows 環境（GitHub Actions）でテストが通る
-      根拠：run 36291836451 で **windows-latest が failure**（ubuntu / macos は success）。
-      日本語の `print` が cp1252 で `UnicodeEncodeError`。修正して3OS すべて success。
+      根拠：**3OS すべて success**（run 36301761360・2026-09-27）。
+      Windows のログ上で `pdf\TKY_202608_報告書.pdf` まで日本語が印字できている。
+      ここに至るまで2回 failure：
+      (1) run 36291836451 テストデータ生成の `print` が cp1252 で `UnicodeEncodeError`
+      (2) run 36293739024 本体は通過し、ワークフロー直書きの検証ワンライナーが同じ理由で落ちた
       → ハマりポイント29件目 `a4-windows-stdout-encoding.md`
 - [x] Python 未導入の PC 向けの配布方法を設計し、手順書を書いた
       根拠：`DISTRIBUTION.md`。方式B（uv 同梱）を推奨。**Windows 実機での検証は未実施**
@@ -91,6 +94,7 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 - **2回目の push でも windows-latest が failure。** 本体は通り、
   ワークフローに直書きした検証用ワンライナーが日本語のファイル名を印字して落ちていた。
   `src/check_output.py` に切り出して同じ対処を通した
+- 3回目で **3OS すべて success**（run 36301761360）。**A-4 は 6/6 で完了**
 
 ### 観察したこと
 
