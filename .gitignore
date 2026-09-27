@@ -45,6 +45,7 @@ projects/a2-rag/systems/custom/results/
 # ===== A-4 生成物（generate_testdata.py で再生成可能・シード固定） =====
 projects/a4-python-batch/input/
 projects/a4-python-batch/output/
+projects/a5a-scraping/output/
 
 # ===== A-2 生成物（generate.py で再生成可能・シード固定） =====
 projects/a2-rag/corpus/out/

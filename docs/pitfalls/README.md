@@ -50,3 +50,5 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 | [a3-n8n-item-multiplication](a3-n8n-item-multiplication.md) | A-3 | 参照データを読むと以降が行数倍で実行される。業務ルールをシートに置けない | ノードベースツール全般 |
 | [a4-endpoint-protection-blocks-import](a4-endpoint-protection-blocks-import.md) | A-4 | エンドポイント保護のスキャンで新規パッケージの import が数十秒ブロックされる | EDR 導入端末すべて |
 | [a4-windows-stdout-encoding](a4-windows-stdout-encoding.md) | A-4 | 日本語の print が Windows で落ちる。日本語 Windows では再現せず、自動実行だけが壊れる | 日本語を印字する Python 全般 |
+| [a5a-js-rendered-silent-zero](a5a-js-rendered-silent-zero.md) | A-5a | JS 描画ページを静的取得すると10ページ巡回して0件・終了コード0。ページ送りだけが静的に存在する | ブラウザを使わない取得手段 |
+| [a5a-robots-404-means-allow](a5a-robots-404-means-allow.md) | A-5a | robots.txt が404だと「許可」と表示される。確認したことにならない | urllib.robotparser 利用時 |

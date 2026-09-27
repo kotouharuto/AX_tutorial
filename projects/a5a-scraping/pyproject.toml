@@ -1,0 +1,18 @@
+[project]
+name = "a5a-scraping"
+version = "0.1.0"
+description = "A-5a: スクレイピング（静的・JS描画・差分通知）"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32",           # 静的ページの取得
+    "beautifulsoup4>=4.12",     # HTML 解析
+]
+
+[project.optional-dependencies]
+# Playwright は本体とは別にブラウザのダウンロードが必要（数百MB）。
+# 静的取得との差を見せるまでは入れないので、任意依存にしておく。
+js = ["playwright>=1.47"]
+dev = ["pytest>=8.0"]
+
+[tool.ruff]
+line-length = 100
