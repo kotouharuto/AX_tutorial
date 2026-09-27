@@ -7,7 +7,7 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 
 | ブロック | 内容 | 状態 |
 |---|---|---|
-| A-4 | Python バッチ（Excel＋ファイル処理） | **5/6**（CI の結果確認とユーザー実行が残り） |
+| A-4 | Python バッチ（Excel＋ファイル処理） | **5/6**（GitHub Actions の実行結果のみ未確認） |
 | A-5a | スクレイピング | 未着手 |
 | A-5b | Slack Bot | 未着手 |
 | A-6a | MCP サーバー | 未着手 |
@@ -20,7 +20,7 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 ## 2026-09-25〜26（セッション1）
 
 **ブロック**：A-4
-**作業時間**：（ユーザー申告待ち）
+**作業時間**：約3時間（ユーザー申告）
 
 ### やったこと
 
@@ -43,7 +43,10 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
       根拠：`.github/workflows/a4-python-batch.yml` を追加。**push 後の結果は未確認**
 - [x] Python 未導入の PC 向けの配布方法を設計し、手順書を書いた
       根拠：`DISTRIBUTION.md`。方式B（uv 同梱）を推奨。**Windows 実機での検証は未実施**
-- [ ] Claude Code の外の環境で実行を確認した（**ユーザーが実施**）
+- [x] Claude Code の外の環境で実行を確認した（**ユーザーが実施・2026-09-26**）
+      根拠：ユーザーのターミナルで `cd src && uv run python main.py` を実行し、
+      出力が開発時と完全に一致。**`src/` から実行しても動いた**ことで、
+      カレントディレクトリに依存しないことも確認できた（配布時に効く）
 - [x] 実測：ファイル数×行数と処理時間
       根拠：5ファイル・80行・0.23〜0.26秒（初回のみ7.84秒）
 
@@ -67,5 +70,4 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 ### 次にやること
 
 - GitHub Actions を push して windows-latest の結果を確認する
-- ユーザーが Claude Code の外（ターミナル）で `python src/main.py` を実行して確認
-- 作業時間の申告を progress.md に記録
+- A-5a（スクレイピング）に着手
