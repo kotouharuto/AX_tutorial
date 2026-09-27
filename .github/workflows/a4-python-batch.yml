@@ -1,8 +1,12 @@
 # A-4 の Windows 検証
 #
 # Windows 実機がないため、CI で windows-latest を使って確認する。
-# 確認できること：パス区切り、改行コード、cp932 の読み込み、openpyxl の挙動
+# 確認できること：パス区切り、改行コード、cp932 の読み込み、openpyxl の挙動、
+#   stdout のエンコーディング（ランナーは en-US なので cp1252。日本語 Windows の cp932 とは別）
 # 確認できないこと：Python 未導入の PC での配布・起動（ランナーには Python が入っているため）
+#
+# 【この CI で実際に見つかった不具合】日本語の print が cp1252 で UnicodeEncodeError になる。
+# 日本語 Windows のコンソール（cp932）では再現しないため、実機があっても手動実行では気づけない。
 
 name: a4-python-batch
 
@@ -44,6 +48,14 @@ jobs:
 
       - name: テスト
         run: uv run pytest tests/ -v
+
+      # 【リグレッション検知】日本語を1文字も出せない文字コードを stdout に強制する。
+      # console.force_utf8_stdio() の呼び出しが抜けると、このステップだけが落ちる。
+      # 全 OS で走らせる理由：Windows ランナーのロケール設定に検知を依存させないため。
+      - name: 日本語を出せない文字コードでも落ちないことを確認
+        env:
+          PYTHONIOENCODING: cp1252
+        run: uv run python src/main.py
 
       - name: バッチを通しで実行
         run: uv run python src/main.py

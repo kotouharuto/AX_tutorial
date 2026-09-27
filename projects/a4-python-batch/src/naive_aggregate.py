@@ -15,9 +15,14 @@
 - 空行・合計行の除去
 """
 
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from console import force_utf8_stdio  # noqa: E402
 
 INPUT_DIR = Path(__file__).resolve().parent.parent / "input" / "excel"
 
@@ -39,6 +44,7 @@ def load_all() -> pd.DataFrame:
 
 def main() -> None:
     """読み込み、集計し、結果を表示する。"""
+    force_utf8_stdio()  # Windows で日本語の印字が落ちるのを防ぐ（console.py 参照）
     df = load_all()
     print(f"読み込み: {len(df)} 行 / {df['__file'].nunique()} ファイル")
     print(f"列: {list(df.columns)}\n")

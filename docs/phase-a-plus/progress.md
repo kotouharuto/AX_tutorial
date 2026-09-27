@@ -7,7 +7,7 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 
 | ブロック | 内容 | 状態 |
 |---|---|---|
-| A-4 | Python バッチ（Excel＋ファイル処理） | **5/6**（GitHub Actions の実行結果のみ未確認） |
+| A-4 | Python バッチ（Excel＋ファイル処理） | **完了（6/6）** |
 | A-5a | スクレイピング | 未着手 |
 | A-5b | Slack Bot | 未着手 |
 | A-6a | MCP サーバー | 未着手 |
@@ -40,7 +40,9 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 - [x] 数式セルの読み込み挙動を観察し、記録した
       根拠：`data_only` なし=数式文字列 / あり=None / pandas=NaN。実際の値176はどれでも取れない
 - [x] Windows 環境（GitHub Actions）でテストが通る
-      根拠：`.github/workflows/a4-python-batch.yml` を追加。**push 後の結果は未確認**
+      根拠：run 36291836451 で **windows-latest が failure**（ubuntu / macos は success）。
+      日本語の `print` が cp1252 で `UnicodeEncodeError`。修正して3OS すべて success。
+      → ハマりポイント29件目 `a4-windows-stdout-encoding.md`
 - [x] Python 未導入の PC 向けの配布方法を設計し、手順書を書いた
       根拠：`DISTRIBUTION.md`。方式B（uv 同梱）を推奨。**Windows 実機での検証は未実施**
 - [x] Claude Code の外の環境で実行を確認した（**ユーザーが実施・2026-09-26**）
@@ -69,5 +71,47 @@ A-1〜A-3 の進捗は `docs/progress.md`、総括は `docs/phase-a-summary.md`�
 
 ### 次にやること
 
-- GitHub Actions を push して windows-latest の結果を確認する
+- A-5a（スクレイピング）に着手
+
+---
+
+## 2026-09-27（セッション2）
+
+**ブロック**：A-4（仕上げ）
+**作業時間**：約1時間
+
+### やったこと
+
+- 6コミットを origin/main に push し、GitHub Actions を初回実行
+- **windows-latest が failure**。日本語の `print` が cp1252 で落ちていた
+- 対処：`src/console.py` に `force_utf8_stdio()` を作り、3つのエントリポイント冒頭で呼ぶ
+- リグレッション検知として `PYTHONIOENCODING: cp1252` のステップを**全 OS に**追加
+- `output/load_report.txt` に実行環境（platform / Python / stdout の文字コード）を記録
+- ハマりポイント29件目を作成、28件目に追記
+
+### 観察したこと
+
+- **英語ロケールの Windows と日本語 Windows で結果が逆になる。**
+  印字している非ASCII文字51種のうち、cp932 では0種、cp1252 では51種が出せない。
+  顧客が日本語 Windows で手動実行すると再現せず、
+  タスクスケジューラ経由・リダイレクト・英語環境だけで落ちる
+- **CI を緑にする修正と、不具合を直す修正は別物。** `PYTHONUTF8=1` を
+  ワークフローに足せば緑になるが、環境変数は配布先に付いていかない。
+  コード側に置いたのはこのため
+- 修正の検証として `console.py` を一時的に無効化したら、
+  **macOS 上で Windows と同じエラーが再現した**。
+  cp1252 を強制すれば、Windows 実機なしで検知を維持できる
+- **エンドポイント保護のスキャンは遅延で済まないことがある。**
+  xlsx 書き込み中に `TimeoutError: [Errno 60]` で異常終了し、
+  再実行では 9.6 秒で成功した。**再現しない失敗**として現れる（28件目に追記）
+- `git push` もスキャン待ちに入る（3分以上、CPU 0%、終了コード0）
+- 自分の待機ループのバグ：`pgrep -f <名前>` は**待機ループ自身のコマンド文字列にマッチ**するため、
+  対象が終了しても永久に回る。PID を指定して `kill -0` で待つ形に直した
+
+### 未確認のデータ（ユーザー確認待ち）
+
+- なし
+
+### 次にやること
+
 - A-5a（スクレイピング）に着手

@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from console import force_utf8_stdio, stdio_encodings  # noqa: E402
 from loader import load_all  # noqa: E402
 from pdf_tasks import merge_pdfs, rename_pdfs  # noqa: E402
 from report import build_crosstab, write_report  # noqa: E402
@@ -34,6 +35,8 @@ OUTPUT_DIR = BASE_DIR / "output"
 
 def main() -> int:
     """バッチを実行する。異常があれば終了コードを 1 にする。"""
+    # 印字より前に呼ぶ。Windows の既定は日本語を出せないことがある（console.py 参照）
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description="支店別問い合わせ集計バッチ")
     parser.add_argument("--month", default="2026-08", help="対象月（YYYY-MM）")
     args = parser.parse_args()
@@ -86,10 +89,15 @@ def main() -> int:
 
     # --- 5. 内訳をテキストでも残す ---
     elapsed = time.time() - started
+    encodings = stdio_encodings()
     lines = [
         f"実行日時: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"対象月: {args.month}",
         f"処理時間: {elapsed:.2f} 秒",
+        # 配布先で不具合が出たとき、このファイルを送ってもらえば環境差を切り分けられる。
+        # Windows はロケールによって cp932 / cp1252 に分かれ、後者では日本語が印字できない。
+        f"実行環境: {sys.platform} / Python {sys.version.split()[0]}"
+        f" / stdout={encodings['stdout']}",
         f"読み込み: {len(reports)} ファイル / 明細 {len(df)} 行",
         "",
         "【ファイル別の内訳】",

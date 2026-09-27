@@ -10,6 +10,7 @@
 """
 
 import random
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -19,6 +20,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfgen import canvas
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from console import force_utf8_stdio  # noqa: E402
 
 SEED = 20260925
 OUT_DIR = Path(__file__).resolve().parent.parent / "input"
@@ -140,6 +145,7 @@ def write_branch_pdf(path: Path, branch_label: str, month: date, total: int) -> 
 
 def main() -> None:
     """入力ファイル一式を生成する。"""
+    force_utf8_stdio()  # Windows で日本語の印字が落ちるのを防ぐ（console.py 参照）
     rng = random.Random(SEED)
     month = date(2026, 8, 1)
 
