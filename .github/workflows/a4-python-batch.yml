@@ -60,8 +60,10 @@ jobs:
       - name: バッチを通しで実行
         run: uv run python src/main.py
 
+      # ワンライナーで書いていたが、日本語のファイル名を印字するため
+      # cp1252 環境で落ちた。**検証側のコードも同じ入口（console.py）を通す。**
       - name: 出力を確認
-        run: uv run python -c "from pathlib import Path; [print(p.name, p.stat().st_size) for p in sorted(Path('output').rglob('*')) if p.is_file()]"
+        run: uv run python src/check_output.py
 
       - name: 失敗時に出力を回収
         if: failure()
