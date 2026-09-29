@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A-5a の定期実行（macOS / launchd）
+
+  【踏んだ落とし穴】最初は ProgramArguments に
+      /bin/bash -c "cd <dir> && uv run python src/run.py"
+  と書いたが、**終了コード 127「uv: command not found」で失敗した。**
+  launchd は ~/.zshrc を読まないため PATH に ~/.local/bin が無い。
+  `launchctl getenv PATH` が空であることで事前に確認できる。
+
+  【対処】uv を経由せず、仮想環境の python を絶対パスで直接呼ぶ。
+  実行時に uv を必要としないので、PATH に依存しない。
+  依存の同期（uv sync）は配備時に済ませておく前提。
+  **定期実行のたびに依存を解決させない**（ネットワーク断で止まる）。
+
+  配置：~/Library/LaunchAgents/com.axtutorial.a5a-scraping.plist
+  読み込み：launchctl bootstrap gui/$(id -u) <plist>
+  解除：    launchctl bootout gui/$(id -u)/com.axtutorial.a5a-scraping
+  即時実行：launchctl kickstart -k gui/$(id -u)/com.axtutorial.a5a-scraping
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.axtutorial.a5a-scraping</string>
+
+    <!-- 仮想環境の python を絶対パスで指定する。PATH に依存させない。 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/.venv/bin/python</string>
+        <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/src/run.py</string>
+        <string>--target</string>
+        <string>quotes</string>
+    </array>
+
+    <!-- run.py は __file__ 起点の絶対パスを使うので cwd に依存しないが、
+         相対パスを混ぜた場合に備えて明示しておく。 -->
+    <key>WorkingDirectory</key>
+    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping</string>
+
+    <!-- launchd の PATH は最小限。外部コマンドを呼ぶ可能性に備えて明示する。 -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- 検証用に5分間隔。実運用では StartCalendarInterval で1日1回にする。
+         取得先に負荷をかけないため、短い間隔は検証中だけにする。 -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- **画面が無いので、出力先を指定しないと何も分からない。** -->
+    <key>StandardOutPath</key>
+    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/output/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/output/launchd.err.log</string>
+</dict>
+</plist>
