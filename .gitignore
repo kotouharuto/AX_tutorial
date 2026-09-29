@@ -32,6 +32,9 @@ npm-debug.log*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
 .ruff_cache/
 .ipynb_checkpoints/
 
