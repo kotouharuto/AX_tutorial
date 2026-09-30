@@ -8,6 +8,19 @@
   launchd は ~/.zshrc を読まないため PATH に ~/.local/bin が無い。
   `launchctl getenv PATH` が空であることで事前に確認できる。
 
+  【2つ目の落とし穴】仮想環境の python を絶対パスで指定しても
+      OSError: [Errno 11] Resource deadlock avoided
+  で失敗した。原因は **macOS の TCC**。launchd から起動したプロセスは
+  ~/Desktop を読めない（最小の plist で cat / ls を試すと
+  「Operation not permitted」が出る）。エラー文からは原因が読めない。
+
+  さらに ~/Desktop は **iCloud Drive の同期対象**でもあった。
+  TCC 以前に、同期下は定期実行の置き場所として不適切
+  （実体化されていないファイル、同期の競合、オフライン時の失敗）。
+
+  → プロジェクトを ~/dev へ移した。**保護対象フォルダ
+    （Desktop / Documents / Downloads）に定期実行の対象を置かない。**
+
   【対処】uv を経由せず、仮想環境の python を絶対パスで直接呼ぶ。
   実行時に uv を必要としないので、PATH に依存しない。
   依存の同期（uv sync）は配備時に済ませておく前提。
@@ -27,8 +40,8 @@
     <!-- 仮想環境の python を絶対パスで指定する。PATH に依存させない。 -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/.venv/bin/python</string>
-        <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/src/run.py</string>
+        <string>/Users/haruto/dev/ax_tutorial/projects/a5a-scraping/.venv/bin/python</string>
+        <string>/Users/haruto/dev/ax_tutorial/projects/a5a-scraping/src/run.py</string>
         <string>--target</string>
         <string>quotes</string>
     </array>
@@ -36,7 +49,7 @@
     <!-- run.py は __file__ 起点の絶対パスを使うので cwd に依存しないが、
          相対パスを混ぜた場合に備えて明示しておく。 -->
     <key>WorkingDirectory</key>
-    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping</string>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5a-scraping</string>
 
     <!-- launchd の PATH は最小限。外部コマンドを呼ぶ可能性に備えて明示する。 -->
     <key>EnvironmentVariables</key>
@@ -45,18 +58,29 @@
         <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
 
-    <!-- 検証用に5分間隔。実運用では StartCalendarInterval で1日1回にする。
+    <!-- 1日1回（07:00）。検証では StartInterval 300（5分）を使い、
+         2回続けて実行されることを確認したうえでこの設定に切り替えた。
          取得先に負荷をかけないため、短い間隔は検証中だけにする。 -->
-    <key>StartInterval</key>
-    <integer>300</integer>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
 
-    <key>RunAtLoad</key>
-    <true/>
+    <!-- **RunAtLoad は入れない。** 入れるとログイン時や再登録の直後に走り、
+         意図しないタイミングで取得先へアクセスする。
+         手動で試すときは launchctl kickstart を使う。 -->
+
+    <!-- 【macOS 固有】スリープ中に予定時刻を過ぎた場合、launchd は
+         復帰後にまとめて1回実行する。**実行されない日がある**のではなく
+         **遅れて実行される**。時刻の厳密さが要る用途には向かない。 -->
 
     <!-- **画面が無いので、出力先を指定しないと何も分からない。** -->
     <key>StandardOutPath</key>
-    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/output/launchd.out.log</string>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5a-scraping/output/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/haruto/Desktop/ax_tutorial/projects/a5a-scraping/output/launchd.err.log</string>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5a-scraping/output/launchd.err.log</string>
 </dict>
 </plist>

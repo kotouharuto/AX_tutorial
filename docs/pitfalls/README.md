@@ -53,3 +53,4 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 | [a5a-js-rendered-silent-zero](a5a-js-rendered-silent-zero.md) | A-5a | JS 描画ページを静的取得すると10ページ巡回して0件・終了コード0。ページ送りだけが静的に存在する | ブラウザを使わない取得手段 |
 | [a5a-robots-404-means-allow](a5a-robots-404-means-allow.md) | A-5a | robots.txt が404だと「許可」と表示される。確認したことにならない | urllib.robotparser 利用時 |
 | [a5a-selector-break-is-silent](a5a-selector-break-is-silent.md) | A-5a | セレクタ破壊は例外を出さない。件数が正常なまま中身だけ空になり、差分検出も沈黙する | セレクタで抽出する実装すべて |
+| [a5a-launchd-scheduled-execution](a5a-launchd-scheduled-execution.md) | A-5a | 定期実行で3連続失敗。PATH・TCC（保護フォルダ）・iCloud 同期・venv ラッパーの絶対パス | macOS launchd / Windows タスクスケジューラ |
