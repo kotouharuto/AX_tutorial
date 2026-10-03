@@ -1,0 +1,20 @@
+[project]
+name = "a6a-mcp-server"
+version = "0.1.0"
+description = "A-6a: MCP サーバー（社内文書検索・問い合わせ記録の参照）"
+requires-python = ">=3.11"
+dependencies = [
+    # 照合日 2026-10-03 時点の最新。v2 で FastMCP → MCPServer に変わっている。
+    # 上限を付けて、v3 の破壊的変更を勝手に取り込まないようにする。
+    "mcp>=2.3,<3",
+    "rank-bm25>=0.2.2",   # 検索。埋め込みは使わない（起動を軽くするため）
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
