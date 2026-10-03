@@ -23,6 +23,7 @@ REFERENCED = (
     "kit/.claude/skills/commit-check/SKILL.md",
     "kit/.claude/skills/explain-change/SKILL.md",
     "kit/CLAUDE.md",
+    "kit/CLAUDE.example.md",
     "kit/.mcp.json",
 )
 
@@ -132,6 +133,18 @@ def main() -> int:
         checks.append("雛形に <> が残っている OK（埋めるのは利用者）")
     else:
         problems.append("雛形の <> が無い（雛形として機能しない）")
+
+    # 9) 記入例には <> が残っていないこと。
+    #    記入例は「どこまで具体的に書くか」の基準なので、
+    #    空欄が残っていると基準として機能しない（雛形と区別がつかない）。
+    example = (BASE_DIR / "kit/CLAUDE.example.md").read_text(encoding="utf-8")
+    placeholders = re.findall(r"<[^>\n]{1,40}>", example)
+    # 引用記法（`<>` を説明している箇所）は除く
+    placeholders = [m for m in placeholders if not m.startswith("<`")]
+    if placeholders:
+        problems.append(f"記入例に未記入の箇所が残っている: {', '.join(placeholders[:5])}")
+    else:
+        checks.append("記入例は全項目が埋まっている OK")
 
     print("=== 確認した項目 ===")
     for line in checks:
