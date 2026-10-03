@@ -24,24 +24,62 @@ git rev-parse --is-inside-work-tree
 
 ---
 
-## 1. ファイルを配置する（5分）
+## 1. キットの場所を変数に入れる（1分）
 
-対象リポジトリの直下で実行する。`<KIT>` はこのキットの `kit/` の絶対パス。
+以降のコマンドで使うので、**キットの `kit/` の絶対パスを変数にしておく。**
+
+キットを置いた場所で次を実行し、出力をコピーする。
+
+```bash
+cd <キットを展開した場所>/a6b-claude-code-kit && pwd -P
+```
+
+対象リポジトリに移動してから、その値を `KIT` に入れる。
+
+```bash
+cd <対象リポジトリ>
+KIT=<コピーした値>/kit
+```
+
+**値が正しいかを必ず確認する。** ここが違うと以降すべて失敗する。
+
+```bash
+ls -a "$KIT"
+```
+
+`CLAUDE.md`、`.claude`、`.mcp.json` の3つが見えること。
+
+> **`ls -a` の `-a` を省かないこと。** `kit/` の中身はドットファイルが大半なので、
+> `ls "$KIT"` では `CLAUDE.md` しか表示されず、**キットが壊れているように見える。**
+
+---
+
+## 2. ファイルを配置する（4分）
+
+対象リポジトリの直下で実行する。
 
 ```bash
 mkdir -p .claude/skills
-cp -R <KIT>/.claude/settings.json .claude/settings.json
-cp -R <KIT>/.claude/skills/. .claude/skills/
-cp <KIT>/CLAUDE.md CLAUDE.md
-cp <KIT>/.mcp.json .mcp.json
+cp "$KIT/.claude/settings.json" .claude/settings.json
+cp -R "$KIT/.claude/skills/." .claude/skills/
+cp "$KIT/CLAUDE.md" CLAUDE.md
+cp "$KIT/.mcp.json" .mcp.json
 ```
+
+> **`cp -R "$KIT"/* .` で済ませないこと。**
+> `*` はドットファイルに展開されないため、**`.claude/` と `.mcp.json` が漏れる。**
+> しかも `cp` は成功して終了コード0を返すので、**失敗したことに気づけない。**
+> 配置したファイル数を次の手順で必ず数える。
 
 配置後の確認：
 
 ```bash
 ls -1 .claude/settings.json CLAUDE.md .mcp.json
-ls -1 .claude/skills/
+ls -1 .claude/skills/*/SKILL.md | wc -l
 ```
+
+1つ目は**3行**、2つ目は**2**が出ること。
+数が足りない場合は上の `cp` のいずれかが失敗している。
 
 **`.claude/skills/` に `commit-check` と `explain-change` の2つのディレクトリがあること。**
 `SKILL.md` が直接 `.claude/skills/` に置かれている状態は誤り
@@ -53,7 +91,7 @@ ls -1 .claude/skills/*/SKILL.md
 
 ---
 
-## 2. `.gitignore` を確認する（3分）
+## 3. `.gitignore` を確認する（3分）
 
 **コミットするもの**と**しないもの**を分ける。
 
@@ -77,7 +115,7 @@ EOF
 
 ---
 
-## 3. `CLAUDE.md` を埋める（10分）
+## 4. `CLAUDE.md` を埋める（10分）
 
 `<>` の箇所を埋める。**埋めずに配らない。**
 埋まっていない雛形は、読む側に「読まなくてよい文書」だと判断される。
@@ -92,7 +130,7 @@ EOF
 
 ---
 
-## 4. MCP サーバを設定する（5分）
+## 5. MCP サーバを設定する（5分）
 
 `.mcp.json` はプロジェクト共有の MCP 設定。**リポジトリ直下に置く**
 （`.claude/mcp.json` ではない）。
@@ -122,7 +160,7 @@ claude mcp add --transport stdio <サーバ名> --scope project -- <起動コマ
 
 ---
 
-## 5. 動作を確認する（5分）
+## 6. 動作を確認する（5分）
 
 ```bash
 claude
@@ -203,7 +241,7 @@ grep -o 'Bash(git push:\*)' ~/.claude/settings.json
 
 ---
 
-## 6. 各自の上書き（任意・2分）
+## 7. 各自の上書き（任意・2分）
 
 チーム共有の設定を変えずに自分だけ変えたい場合は `.claude/settings.local.json` に書く。
 このファイルはコミットしない。
