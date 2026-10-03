@@ -14,6 +14,7 @@ Claude Code の設定を、**他のチームに渡せる形**にしたもの。
 | [docs-verification.md](docs-verification.md) | 公式ドキュメントとの照合記録 |
 | `kit/` | 配置するファイル一式 |
 | [check_kit.py](check_kit.py) | 静的な整合性チェック（**再現テストではない**） |
+| [examples/CLAUDE.mapping-system.md](examples/CLAUDE.mapping-system.md) | 壁打ちで作った記入例（実務に近い題材・257行） |
 
 ```
 kit/
