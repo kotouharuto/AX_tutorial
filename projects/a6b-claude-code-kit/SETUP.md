@@ -179,6 +179,18 @@ export CONTEXT7_API_KEY=<各自のキー>
 > **リモートサーバの URL・ヘッダでは展開されない**（公式仕様）。
 > 展開されているか不明な場合は、サーバが接続できるかで確認する。
 
+### 設定ファイルの対応（混同しやすい）
+
+| ファイル | 誰が読むか | 何を書くか |
+|---|---|---|
+| `.claude/settings.json` / `settings.local.json` | Claude Code | **権限**・フック（MCP サーバは書かない） |
+| `~/.claude.json` | Claude Code | **MCP サーバ**（local / user スコープ） |
+| `.mcp.json`（リポジトリ直下） | Claude Code | **MCP サーバ**（project スコープ・チーム共有） |
+| `claude_desktop_config.json` | **Claude Desktop** | **MCP サーバ**（Desktop 用） |
+
+**Claude Code と Claude Desktop は MCP の設定を共有しない。**
+同じサーバを両方で使うには、それぞれに登録する。
+
 ### 自作の MCP サーバを追加する場合
 
 ```bash

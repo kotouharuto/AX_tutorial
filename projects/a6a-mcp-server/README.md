@@ -141,3 +141,78 @@ A-5a の「0件を成功扱いしない」と同じ考え方。
   `tests/test_no_stdout.py` で本番コードに `print` が無いことを静的に検査している
 
 観察に使ったスクリプト：`tests/probe_print.py`、`tests/observe_print.py`
+
+## クライアントへの接続（2026-10-04〜05）
+
+### 接続の結果
+
+| クライアント | 登録先 | 確認したこと |
+|---|---|---|
+| Claude Code（ターミナル） | `~/.claude.json`（`claude mcp add`・local スコープ） | 正常系・**異常系で Claude が原因を説明**できた |
+| Claude Code（Desktop のコードタブ） | 同上 | 正常系 |
+| Claude Desktop（チャット） | `claude_desktop_config.json` | 正常系・設定画面で実行中を確認 |
+
+**Claude Code と Claude Desktop は MCP の設定を共有しない。** 同じサーバを両方で使うには、
+それぞれに登録する必要がある。
+
+異常系（`top_k=50`）で Claude Code が受け取った本文：
+
+```
+Error executing tool search_documents:
+top_k は 1〜10 で指定すること（指定値: 50）。
+```
+
+Claude はこれを読み、上限の10で再実行するかを提案した。
+プロトコル越しのテストで固定した「`ToolError` なら原因が届く」が、実クライアントでも成り立った。
+
+### 予測が外れた：Claude Desktop は uv を見つけた
+
+公式例どおり `"command": "uv"` で書いた。**A-5a の launchd と同じく、GUI アプリは
+`~/.zshrc` を読まないので uv が見つからないと予測したが、起動に成功した。**
+
+```
+Using MCP server command: /Users/haruto/.local/bin/uv with path: { paths: [ ...14個... ] }
+Server started and connected successfully
+```
+
+**Desktop は PATH を独自に組み立てていた**（`~/.local/bin`、nodenv、pyenv、nvm、Homebrew を含む14個）。
+launchd の経験を Desktop に当てはめただけで、根拠が足りなかった。
+
+公式ドキュメントの「uv のフルパスが必要な場合がある」は、この PATH に含まれない場所に
+uv を入れた環境で起きると考えられる（未確認）。
+
+### ログから分かったこと
+
+- **サーバは約3秒の間に3回起動された**（起動 → 意図的な終了 → 再起動）。
+  起動処理の重さが3倍効く。埋め込みを使わず BM25 にしたこと、
+  インデックスを呼び出し時に作ることが効いている
+- サーバが `logging` で stderr に出したログが、**Desktop のログファイルにそのまま残る**
+  （`~/Library/Logs/Claude/mcp-server-a6a-docs.log`）。利用者が後から確認できる
+
+### 実クライアントでの print の扱い
+
+起動時に print するサーバ（`tests/probe_print.py`・`PRINT_AT=startup`）を Claude Code に登録し、
+`claude mcp list` で **✔ Connected** になった。Claude Code のクライアントも、
+Python クライアントと同じく起動時の不正な行に寛容だった。
+（`Connected` は起動と初期化が通ったことまで。ツール呼び出し中の print は実クライアントでは未確認）
+
+### auto モードでは MCP ツールが確認なしで動く
+
+Claude Code で検索ツールを呼んだとき、**使用許可を求められなかった。**
+ユーザー設定が `defaultMode: auto` だったため。公式ドキュメントの判定順序：
+
+1. allow / ask / deny のルールに一致すれば、それに従う
+2. 読み取りと作業ディレクトリ内の編集は自動承認
+3. **それ以外は分類器（別のモデル）が判定する** ← MCP ツールはここ
+
+**書き込み・削除・外部送信をするツールでも、分類器が通せば確認なしで実行される。**
+サーバ側で必ず確認させるには、ツールの `_meta` に `anthropic/requiresUserInteraction` を付ける
+（allow ルールに一致しても、auto モードでも、利用者に確認を求める）。
+`readOnlyHint` などのアノテーションを分類器が参照するかは、ドキュメントに記述が無かった。
+
+| ツールの性質 | 推奨 |
+|---|---|
+| 読み取りのみ | 付けない |
+| 書き込み・削除・外部送信 | **`requiresUserInteraction` を付ける** |
+
+参照：https://code.claude.com/docs/en/permission-modes （2026-10-04 照合）
