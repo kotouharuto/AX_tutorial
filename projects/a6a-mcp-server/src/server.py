@@ -18,20 +18,26 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from search import CorpusError, Index, load_corpus
+from sheet import MAX_LIMIT as SHEET_MAX_LIMIT
+from sheet import SheetError, fetch_inquiries
 
 # 標準エラー出力に出す。**標準出力に向けない。**
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("a6a")
 
 CORPUS_ENV = "A6A_CORPUS_DIR"
+SHEET_URL_ENV = "A6A_SHEET_API_URL"
+# 認証情報。**コードにも設定例にも値を書かない。** 環境変数からのみ読む
+SHEET_TOKEN_ENV = "A6A_SHEET_API_TOKEN"
 MAX_TOP_K = 10
 
 server = MCPServer(
     name="a6a-internal-docs",
     instructions=(
-        "社内規程・業務手順の文書を検索するツールを提供する。"
+        "社内規程・業務手順の文書の検索と、問い合わせ記録の参照を提供する。"
         "回答には必ず出典（文書名）を添えること。"
         "検索結果に答えが無い場合は、無いと答え、推測で補わないこと。"
+        "問い合わせ記録には個人を特定できる列（氏名・メールアドレス・担当者）は含まれない。"
     ),
 )
 
@@ -96,6 +102,57 @@ def search_documents(query: str, top_k: int = 5) -> str:
     lines = [f"「{query}」の検索結果：{len(hits)} 件"]
     for rank, hit in enumerate(hits, 1):
         lines.append(f"\n[{rank}] 出典：{hit.doc_name}（スコア {hit.score:.2f}）\n{hit.text}")
+    return "\n".join(lines)
+
+
+@server.tool()
+def list_inquiries(
+    status: str | None = None, category: str | None = None, limit: int = 20
+) -> str:
+    """問い合わせ記録を新しい順に返す。個人を特定できる列（氏名・メールアドレス・担当者）は含まない。
+
+    Args:
+        status: 状態で絞り込む（「完了」「未分類」「エラー」のいずれか。省略時はすべて）
+        category: 分類で絞り込む（「システム障害」「申請手続き」「備品・設備」「その他」。省略時はすべて）
+        limit: 返す件数（1〜50）
+    """
+    if not 1 <= limit <= SHEET_MAX_LIMIT:
+        raise ToolError(f"limit は 1〜{SHEET_MAX_LIMIT} で指定すること（指定値: {limit}）。")
+
+    url = os.environ.get(SHEET_URL_ENV, "").strip()
+    token = os.environ.get(SHEET_TOKEN_ENV, "").strip()
+    missing = [name for name, value in ((SHEET_URL_ENV, url), (SHEET_TOKEN_ENV, token)) if not value]
+    if missing:
+        raise ToolError(
+            f"問い合わせ記録の接続先が設定されていない（未設定: {', '.join(missing)}）。"
+            "GAS のウェブアプリの URL とトークンを、Claude Code なら `claude mcp add` の `-e`、"
+            "Claude Desktop なら設定ファイルの `env` に設定する必要がある。"
+        )
+
+    try:
+        result = fetch_inquiries(url, token, status=status, category=category, limit=limit)
+    except SheetError as exc:
+        # SheetError の文言にはトークンを含めていない（sheet.py 側で保証）
+        raise ToolError(str(exc)) from exc
+
+    # 件数だけ記録する。問い合わせ内容は個人情報を含みうるのでログに出さない
+    logger.info("問い合わせ記録：%d 件中 %d 件を返した", result.total, len(result.rows))
+
+    condition = "・".join(
+        f"{label}={value}" for label, value in (("状態", status), ("分類", category)) if value
+    ) or "条件なし"
+    if not result.rows:
+        return f"問い合わせ記録（{condition}）に該当するものは無かった。"
+
+    lines = [f"問い合わせ記録（{condition}）：{result.total} 件中 {len(result.rows)} 件（新しい順）"]
+    for row in result.rows:
+        lines.append(
+            f"\n- {row.get('timestamp', '')}｜分類：{row.get('category', '')}｜"
+            f"緊急度：{row.get('urgency', '')}｜状態：{row.get('status', '')}\n"
+            f"  内容：{row.get('content', '')}"
+        )
+        if row.get("detail"):
+            lines.append(f"  詳細：{row['detail']}")
     return "\n".join(lines)
 
 
