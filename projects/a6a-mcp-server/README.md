@@ -230,6 +230,7 @@ GAS のコードは `gas/`、デプロイ手順は `gas/DEPLOY.md`（Google ア�
 | トークンの渡し方 | **POST の本文** | GAS のウェブアプリは**HTTP ヘッダを受け取れない**（公式ドキュメントで確認）。URL のクエリはアクセスログや履歴に残る |
 | 返す列 | **個人を特定できる列を除く** | お名前・メールアドレス・担当者（メールアドレス）は返さない。列の選択は GAS 側で固定し、Python 側の誤りで漏れないようにした |
 | スコープ | `spreadsheets.readonly` のみ | 読むだけなので。A-1 で「スコープを足すと承認がやり直し」を踏んでいる |
+| シートの読み方 | **Sheets API（高度なサービス）** | `SpreadsheetApp` は readonly を受け付けないため（下記） |
 
 ### GAS 側の仕様による制約
 
@@ -239,6 +240,41 @@ GAS のコードは `gas/`、デプロイ手順は `gas/DEPLOY.md`（Google ア�
   Python の `urllib` は 302 で POST を GET に切り替えて辿るので、そのまま動く（偽の GAS で確認）
 - **トークン未設定のときは必ず拒否する。** 書き忘れると「設定なし（undefined）」と
   「送られてこない（undefined）」が一致し、誰でも読める状態になる
+
+### 私の誤り：`SpreadsheetApp` は読み取り専用のスコープで動かない
+
+当初 `SpreadsheetApp.openById` で読み、スコープを `spreadsheets.readonly` に絞った。
+**「読むだけなら readonly で足りる」と確かめずに書いていた。** デプロイ時にユーザーの環境で失敗した。
+
+```
+Specified permissions are not sufficient to call SpreadsheetApp.openById.
+Required permissions: https://www.googleapis.com/auth/spreadsheets
+```
+
+公式ドキュメントでは、`SpreadsheetApp` が受け付けるスコープは
+`spreadsheets.currentonly` と `spreadsheets` の2つだけ。**読み取り専用は無い。**
+`currentonly` はスクリプトが紐付いたシート専用で、ID で別のシートを開く構成では使えない。
+
+| 案 | 失うもの |
+|---|---|
+| スコープを `spreadsheets` に広げる | **「全員」に公開し所有者の権限で動く入口が、所有者の全シートの編集・削除権限を持つ** |
+| **Sheets API（高度なサービス）で読む**（採用） | コードの書き換え。日付が表示用の文字列で返る |
+
+`spreadsheets.values.get` は `spreadsheets.readonly` を受け付ける（公式の API リファレンスで確認）。
+**最小権限が一番効くのは、誰でも呼べて所有者の権限で動く入口。** ユーザーの判断で後者を採った。
+
+#### Sheets API に変えて生じた違い
+
+- **行の末尾の空セルを省略して返す。** 行ごとに長さが違う配列になる。
+  そのまま添字で読むと空欄が `undefined` になるので、`cellAt` で空文字に揃えた
+- 既定で表示用の文字列で返る（日付も文字列）。日付の変換処理は不要になった
+
+#### GAS のコードを手元で検査する
+
+GAS は手元で実行できないので、デプロイしてから論理の誤りが見つかると往復が増える。
+`tests/gas/run_code.js` で GAS の部品（`Sheets`・`PropertiesService`・`ContentService`）を
+偽物に差し替え、Node 上で `doPost` を動かす（11件）。pytest からも実行される。
+**偽物は公式ドキュメントの記述から作ったもので、本物の応答の形までは保証しない。**
 
 ### テスト
 

@@ -137,6 +137,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 承認画面が出る。**画面に書かれている内容を読んでから承認する。**
 
 - 要求されているのは「スプレッドシートの**表示**」だけのはず（読み取り専用のスコープに絞っている）
+- 「編集」「作成」「削除」が含まれていたら**承認せず止めて連絡する**（スコープの設定が想定と違う）
 - **項目ごとのチェックボックスが出たら、すべてにチェックを入れる。**
   外すと、承認は通るのに読み取りで失敗する（A-1 で踏んだ）
 
@@ -147,6 +148,26 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 `SHEET_ID が設定されていない` と出たら、3 のプロパティ名の綴りを確認する。
+
+### 次のエラーが出た場合
+
+| エラー | 原因と対処 |
+|---|---|
+| `Specified permissions are not sufficient to call SpreadsheetApp.openById` | **古いコードのまま。** 下の「コードを更新した場合」の手順で送り直す |
+| `Sheets API has not been used in project ...` | Sheets API が有効になっていない。エラー文中の URL を開いて「有効にする」を押し、数分待って再実行 |
+| `シートを読めない。SHEET_ID が正しいか…` | シート ID の誤りか、シート名が「回答」でない。実行ログ（エディタの「実行数」）に詳細がある |
+
+### コードを更新した場合（送り直し）
+
+`Code.js` や `appsscript.json` を直したときは、送り直してから `authorize` をもう一度実行する。
+**スコープや有効にするサービスが変わると、承認画面がもう一度出る。**
+
+```bash
+cd /Users/haruto/dev/ax_tutorial/projects/a6a-mcp-server/gas
+clasp push --force
+```
+
+ブラウザのエディタは**再読み込み**してから `authorize` を実行する（古いコードのまま実行しないため）。
 
 ---
 

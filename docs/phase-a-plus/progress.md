@@ -743,3 +743,26 @@ CLAUDE.md の「**動いてしまった場合は壊し方を考える**」に従
 - デプロイ手順書は A-6b の反省から、**具体的なパスと各手順の確認方法**を付けた。
   記載した clasp のサブコマンドは手元の 3.4.0 で実在を確認した
 - トークンをコマンドに直接書くとシェルの履歴に残るので、`read -rs` で変数に入れる手順にした
+
+### デプロイ時の失敗と修正（2026-10-05）
+
+ユーザーが `authorize` を実行したところ失敗した。**私の誤り。**
+
+```
+Specified permissions are not sufficient to call SpreadsheetApp.openById.
+Required permissions: https://www.googleapis.com/auth/spreadsheets
+```
+
+**`SpreadsheetApp` は読み取り専用のスコープを受け付けない**（受け付けるのは `currentonly` と
+`spreadsheets` のみ）。「読むだけなら readonly で足りる」と確かめずに書き、
+README と手順書にもそう書いていた。A-6a で照合を徹底すると言いながら、ここは照合していなかった。
+
+ユーザーの判断で **Sheets API（高度なサービス）に切り替えて readonly を保った**。
+スコープを広げる案は、「全員」に公開し所有者の権限で動く入口に、全シートの編集・削除権限を
+持たせることになるため採らなかった。
+
+- `spreadsheets.values.get` が readonly を受け付けること、マニフェストの書き方を公式で確認してから書いた
+- **Sheets API は行末の空セルを省略して返す**（行ごとに長さが違う）。空欄が `undefined` になるのを防いだ
+- **GAS のコードを Node 上で検査する仕組みを追加**（偽の部品で `doPost` を動かす・11件）。
+  GAS は手元で実行できず、デプロイ後に論理の誤りが見つかると往復が増えるため
+- 手順書に、よく出るエラーと対処の表、コードを更新したときの送り直し手順を追加
