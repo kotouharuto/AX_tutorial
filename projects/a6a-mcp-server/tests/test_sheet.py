@@ -26,6 +26,9 @@ ROWS = [
      "category": "システム障害", "urgency": "高", "status": "完了", "detail": ""},
     {"timestamp": "2026-09-02T11:00:00+09:00", "content": "経費精算の締め日は？",
      "category": "申請手続き", "urgency": "低", "status": "未分類", "detail": "担当者未設定"},
+    {"timestamp": "2026-09-03T09:00:00+09:00", "content": "議事録が止まった",
+     "category": "システム障害", "urgency": "高", "status": "[想定外の値]", "detail": "",
+     "warnings": ["状態の値が想定外（列ずれの可能性）"]},
 ]
 
 
@@ -90,8 +93,8 @@ def gas_url() -> Iterator[str]:
 def test_リダイレクトを辿って取得できる(gas_url: str) -> None:
     """POST → 302 → GET の流れで応答を受け取れること（本物の GAS と同じ経路）。"""
     result = fetch_inquiries(gas_url, TOKEN)
-    assert result.total == 2
-    assert [r["category"] for r in result.rows] == ["システム障害", "申請手続き"]
+    assert result.total == 3
+    assert [r["category"] for r in result.rows] == ["システム障害", "申請手続き", "システム障害"]
 
 
 def test_トークンは本文で送りURLに載せない(gas_url: str) -> None:
@@ -156,8 +159,10 @@ async def test_ツールとして呼ぶと整形して返る(gas_url: str, monke
     monkeypatch.setenv("A6A_SHEET_API_TOKEN", TOKEN)
     result = await call("list_inquiries", {"limit": 10})
     text = "\n".join(c.text for c in result.content if hasattr(c, "text"))
-    assert "2 件中 2 件" in text
+    assert "3 件中 3 件" in text
     assert "VPN に繋がらない" in text
+    # 列ずれの警告が Claude に届くこと
+    assert "注意：状態の値が想定外（列ずれの可能性）" in text
 
 
 async def test_未設定なら不足している変数名が届く(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -179,3 +184,12 @@ async def test_シート側の失敗が原因付きで届く(gas_url: str, monke
 async def test_limitの範囲外は理由付き(limit: int) -> None:
     exc = await call("list_inquiries", {"limit": limit})
     assert "1〜50" in str(exc)
+
+
+
+def test_サーバの説明が個人情報の不在を断定しない() -> None:
+    """**偽の保証を宣言しない。** 以前「個人を特定できる列は含まれない」と書いており、
+    列ずれした行のメールアドレスが素通りしていた。"""
+    instructions = server_mod.server.instructions or ""
+    assert "含まれない。" not in instructions
+    assert "断定しないこと" in instructions

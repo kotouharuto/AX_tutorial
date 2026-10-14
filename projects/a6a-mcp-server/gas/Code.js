@@ -9,6 +9,10 @@
  *    URL のクエリに載せるとアクセスログや履歴に残るので、本文に入れる。
  * 2. 個人を特定できる列（お名前・メールアドレス・担当者）は返さない。
  *    「どの列を返すか」をここで決めておけば、Python 側の間違いで漏れることがない。
+ *    **ただし列で絞るだけでは足りない。** 書き込み側の不具合で列がずれた行では、
+ *    メールアドレスが「状態」や「内容」に入っていた（実データで確認）。
+ *    そのため値でも伏せる（redactRow を参照）。それでも完全には防げない：
+ *    同じ行の「お名前」列に無い氏名（本文に書かれた別人の名前など）は伏せられない。
  * 3. HTTP のステータスコードは常に 200 になる（ContentService では変えられない）。
  *    そのため成功・失敗は本文の ok で表す。呼び出し側は ok を必ず見ること。
  * 4. シートは SpreadsheetApp ではなく Sheets API（高度なサービス）で読む。
@@ -44,6 +48,30 @@ const EXPOSED_COLUMNS = {
   '緊急度': 'urgency',
   '状態': 'status',
   '詳細': 'detail',
+};
+
+/**
+ * 返さない列。返す値の中にこれらと同じ文字列があれば伏せる（列ずれ・本文への記載に備える）。
+ * 値は伏せたあとに入れる目印。
+ */
+const HIDDEN_COLUMNS = {
+  'お名前': '[氏名]',
+  'メールアドレス': '[メールアドレス]',
+  '担当者': '[担当者]',
+};
+
+/** メールアドレスの形。列に関係なく、返す値の中から見つけたら伏せる */
+const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/**
+ * 列ごとに想定している値（A-1 の Config.js と分類のプロンプトに合わせる）。
+ * これ以外の値が入っていたら列ずれを疑い、値を伏せて警告を付ける。
+ * 空欄は許す（分類前の行・処理が途中で止まった行がある）。
+ */
+const ALLOWED_VALUES = {
+  '状態': ['完了', '未分類', 'エラー'],
+  '分類': ['システム障害', '申請手続き', '備品・設備', 'その他'],
+  '緊急度': ['高', '中', '低'],
 };
 
 /** 1回で返す件数の上限。大量に返すと Claude の文脈を圧迫するため */
@@ -174,6 +202,13 @@ function readRows(request) {
     index[name] = i;
   });
 
+  // 除外する列の位置。見つからなくても止めない（伏せる手がかりが減るだけ）
+  const hiddenIndex = {};
+  Object.keys(HIDDEN_COLUMNS).forEach(function (name) {
+    const i = header.indexOf(name);
+    if (i !== -1) hiddenIndex[name] = i;
+  });
+
   const matched = values.slice(1)
     .filter(function (row) { return cellAt(row, index['タイムスタンプ']) !== ''; }) // 空行を除く
     .filter(function (row) { return !request.status || cellAt(row, index['状態']) === request.status; })
@@ -183,13 +218,50 @@ function readRows(request) {
     .reverse() // 下にあるほど新しいので、新しい順にする
     .slice(0, request.limit)
     .map(function (row) {
-      const item = {};
-      Object.keys(EXPOSED_COLUMNS).forEach(function (name) {
-        item[EXPOSED_COLUMNS[name]] = String(cellAt(row, index[name]));
-      });
-      return item;
+      return redactRow(row, index, hiddenIndex);
     });
   return { total: matched.length, items: items };
+}
+
+/**
+ * 1行を、返してよい形にする。列で絞ったうえで、値でも伏せる。
+ *
+ * 1. 想定外の値（列ずれの疑い）は値ごと伏せ、warnings に理由を残す
+ * 2. 同じ行の「お名前」「メールアドレス」「担当者」と同じ文字列を、返す値から伏せる
+ * 3. メールアドレスの形をした文字列を、列に関係なく伏せる
+ *
+ * @returns {Object} 返す値と warnings（警告が無ければ空配列）
+ */
+function redactRow(row, index, hiddenIndex) {
+  const warnings = [];
+
+  // 伏せる対象の文字列（同じ行の除外列の値）。2文字未満は誤って広く消すので対象外
+  const secrets = [];
+  Object.keys(hiddenIndex).forEach(function (name) {
+    const value = String(cellAt(row, hiddenIndex[name])).trim();
+    if (value.length >= 2) secrets.push({ value: value, mark: HIDDEN_COLUMNS[name] });
+  });
+
+  const item = {};
+  Object.keys(EXPOSED_COLUMNS).forEach(function (name) {
+    let value = String(cellAt(row, index[name]));
+
+    const allowed = ALLOWED_VALUES[name];
+    if (allowed && value !== '' && allowed.indexOf(value) === -1) {
+      // 想定外の値は中身が何か分からない（個人情報の可能性もある）ので、値ごと伏せる
+      warnings.push(name + 'の値が想定外（列ずれの可能性）');
+      value = '[想定外の値]';
+    }
+
+    secrets.forEach(function (s) {
+      value = value.split(s.value).join(s.mark); // 文字列の全置換（正規表現の記号を気にしなくてよい）
+    });
+    value = value.replace(EMAIL_PATTERN, '[メールアドレス]');
+
+    item[EXPOSED_COLUMNS[name]] = value;
+  });
+  item.warnings = warnings;
+  return item;
 }
 
 /** JSON の応答を作る */
