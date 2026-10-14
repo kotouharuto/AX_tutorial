@@ -26,9 +26,10 @@ ROWS = [
      "category": "システム障害", "urgency": "高", "status": "完了", "detail": ""},
     {"timestamp": "2026-09-02T11:00:00+09:00", "content": "経費精算の締め日は？",
      "category": "申請手続き", "urgency": "低", "status": "未分類", "detail": "担当者未設定"},
-    {"timestamp": "2026-09-03T09:00:00+09:00", "content": "議事録が止まった",
-     "category": "システム障害", "urgency": "高", "status": "[想定外の値]", "detail": "",
-     "warnings": ["状態の値が想定外（列ずれの可能性）"]},
+    {"timestamp": "2026-09-03T09:00:00+09:00", "content": "[列ずれのため非表示]",
+     "category": "システム障害", "urgency": "高", "status": "[想定外の値]",
+     "detail": "[列ずれのため非表示]",
+     "warnings": ["列ずれの可能性（状態の値が想定外）。内容と詳細は表示しない"]},
 ]
 
 
@@ -162,7 +163,7 @@ async def test_ツールとして呼ぶと整形して返る(gas_url: str, monke
     assert "3 件中 3 件" in text
     assert "VPN に繋がらない" in text
     # 列ずれの警告が Claude に届くこと
-    assert "注意：状態の値が想定外（列ずれの可能性）" in text
+    assert "注意：列ずれの可能性（状態の値が想定外）" in text
 
 
 async def test_未設定なら不足している変数名が届く(monkeypatch: pytest.MonkeyPatch) -> None:

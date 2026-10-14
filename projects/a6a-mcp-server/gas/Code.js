@@ -13,6 +13,11 @@
  *    メールアドレスが「状態」や「内容」に入っていた（実データで確認）。
  *    そのため値でも伏せる（redactRow を参照）。それでも完全には防げない：
  *    同じ行の「お名前」列に無い氏名（本文に書かれた別人の名前など）は伏せられない。
+ * 5. **列ずれした行は、内容と詳細を出さない。**
+ *    当初は列ずれした行でも「同じ行のお名前列の値」を他の列から伏せていた。
+ *    ところがお名前列に日時が入っている行があり、日時欄が [氏名] に置き換わって、
+ *    Claude が「日時欄に氏名が入っている」と事実と違う説明をした（実データで確認）。
+ *    列ずれした行では、どこに何が入っているか分からないので、位置を推測して伏せない。
  * 3. HTTP のステータスコードは常に 200 になる（ContentService では変えられない）。
  *    そのため成功・失敗は本文の ok で表す。呼び出し側は ok を必ず見ること。
  * 4. シートは SpreadsheetApp ではなく Sheets API（高度なサービス）で読む。
@@ -73,6 +78,15 @@ const ALLOWED_VALUES = {
   '分類': ['システム障害', '申請手続き', '備品・設備', 'その他'],
   '緊急度': ['高', '中', '低'],
 };
+
+/** 日時の形（シートの表示形式 2026/08/25 22:46:31 や 2026-08-25 を想定。日付部分だけ見る） */
+const DATE_PATTERN = /^\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/;
+
+/** メールアドレスの形（1件まるごと）。列の値がメールアドレスとして妥当かを見る */
+const EMAIL_ONLY_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+/** 列ずれした行で、内容と詳細の代わりに入れる目印 */
+const SHIFTED_MARK = '[列ずれのため非表示]';
 
 /** 1回で返す件数の上限。大量に返すと Claude の文脈を圧迫するため */
 const MAX_LIMIT = 50;
@@ -224,33 +238,80 @@ function readRows(request) {
 }
 
 /**
- * 1行を、返してよい形にする。列で絞ったうえで、値でも伏せる。
+ * 行の列が正しく対応しているかを調べ、列ずれの疑いがあれば理由を返す。
  *
- * 1. 想定外の値（列ずれの疑い）は値ごと伏せ、warnings に理由を残す
- * 2. 同じ行の「お名前」「メールアドレス」「担当者」と同じ文字列を、返す値から伏せる
- * 3. メールアドレスの形をした文字列を、列に関係なく伏せる
+ * 見るのは「その列に入るはずの値の形」。中身の正しさは判定できないので、
+ * 明らかに形が違うもの（お名前に日時、メールアドレス列にメールでない値など）だけを拾う。
+ *
+ * @returns {string[]} 列ずれを疑う理由（無ければ空配列）
+ */
+function findShiftReasons(row, index, hiddenIndex) {
+  const reasons = [];
+
+  const timestamp = String(cellAt(row, index['タイムスタンプ'])).trim();
+  if (!DATE_PATTERN.test(timestamp)) {
+    reasons.push('タイムスタンプが日時の形でない');
+  }
+
+  Object.keys(ALLOWED_VALUES).forEach(function (name) {
+    const value = String(cellAt(row, index[name]));
+    if (value !== '' && ALLOWED_VALUES[name].indexOf(value) === -1) {
+      reasons.push(name + 'の値が想定外');
+    }
+  });
+
+  if ('お名前' in hiddenIndex) {
+    const name = String(cellAt(row, hiddenIndex['お名前'])).trim();
+    if (DATE_PATTERN.test(name) || EMAIL_ONLY_PATTERN.test(name)) {
+      reasons.push('お名前の列に日時かメールアドレスが入っている');
+    }
+  }
+  ['メールアドレス', '担当者'].forEach(function (col) {
+    if (!(col in hiddenIndex)) return;
+    const value = String(cellAt(row, hiddenIndex[col])).trim();
+    if (value !== '' && !EMAIL_ONLY_PATTERN.test(value)) {
+      reasons.push(col + 'の列がメールアドレスの形でない');
+    }
+  });
+  return reasons;
+}
+
+/**
+ * 1行を、返してよい形にする。
+ *
+ * - 列ずれの疑いがある行：内容と詳細を出さない。想定外の値は伏せる。
+ *   どこに何が入っているか分からないので、個人情報の位置を推測して伏せることはしない
+ * - 正常な行：同じ行の「お名前」「メールアドレス」「担当者」と同じ文字列を他の列から伏せる
+ * - どちらの場合も、メールアドレスの形をした文字列は列に関係なく伏せる（最後の防御）
  *
  * @returns {Object} 返す値と warnings（警告が無ければ空配列）
  */
 function redactRow(row, index, hiddenIndex) {
-  const warnings = [];
+  const reasons = findShiftReasons(row, index, hiddenIndex);
+  const shifted = reasons.length > 0;
 
-  // 伏せる対象の文字列（同じ行の除外列の値）。2文字未満は誤って広く消すので対象外
+  // 正常な行だけ、同じ行の除外列の値を使って伏せる。2文字未満は広く消しすぎるので対象外
   const secrets = [];
-  Object.keys(hiddenIndex).forEach(function (name) {
-    const value = String(cellAt(row, hiddenIndex[name])).trim();
-    if (value.length >= 2) secrets.push({ value: value, mark: HIDDEN_COLUMNS[name] });
-  });
+  if (!shifted) {
+    Object.keys(hiddenIndex).forEach(function (name) {
+      const value = String(cellAt(row, hiddenIndex[name])).trim();
+      if (value.length >= 2) secrets.push({ value: value, mark: HIDDEN_COLUMNS[name] });
+    });
+  }
 
   const item = {};
   Object.keys(EXPOSED_COLUMNS).forEach(function (name) {
     let value = String(cellAt(row, index[name]));
 
-    const allowed = ALLOWED_VALUES[name];
-    if (allowed && value !== '' && allowed.indexOf(value) === -1) {
-      // 想定外の値は中身が何か分からない（個人情報の可能性もある）ので、値ごと伏せる
-      warnings.push(name + 'の値が想定外（列ずれの可能性）');
+    if (shifted && (name === '問い合わせ内容' || name === '詳細')) {
+      value = SHIFTED_MARK; // 自由記述は何が混ざっているか分からないので出さない
+    } else if (name === 'タイムスタンプ' && !DATE_PATTERN.test(value.trim())) {
       value = '[想定外の値]';
+    } else {
+      const allowed = ALLOWED_VALUES[name];
+      if (allowed && value !== '' && allowed.indexOf(value) === -1) {
+        value = '[想定外の値]'; // 中身が何か分からない（個人情報の可能性もある）
+      }
     }
 
     secrets.forEach(function (s) {
@@ -260,7 +321,10 @@ function redactRow(row, index, hiddenIndex) {
 
     item[EXPOSED_COLUMNS[name]] = value;
   });
-  item.warnings = warnings;
+
+  item.warnings = shifted
+    ? ['列ずれの可能性（' + reasons.join('／') + '）。内容と詳細は表示しない']
+    : [];
   return item;
 }
 

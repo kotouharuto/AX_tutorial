@@ -29,6 +29,8 @@ const SHEET = [
   ['2026/09/05 09:00:00', '高橋 花子', 'hanako@example.com', '高橋 花子です。上司の other@example.org にも共有してください', 'その他', '低', 'soumu@example.com', '完了', ''],
   // 分類が想定外（列ずれ）
   ['2026/09/06 09:00:00', '伊藤', 'ito@example.com', '備品が届かない', '伊藤', '中', 'soumu@example.com', '完了', ''],
+  // 【実データの再現 #16】お名前の列に日時が入っている。日時欄は正しい
+  ['2026/09/07 09:00:00', '2026/09/07 09:00:00', 'kato@example.com', '加藤です。ポータルに入れません', 'システム障害', '高', 'it@example.com', '完了', ''],
 ];
 
 function load({ props = {}, values = SHEET, throwOnGet = false } = {}) {
@@ -76,8 +78,8 @@ function check(name, fn) {
 check('正しいトークンで新しい順に返る', () => {
   const r = post(load({ props: PROPS }), { token: 'secret-token' });
   assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.total, 6, '空行を除いて6件');
-  assert.strictEqual(r.rows[0].timestamp, '2026/09/06 09:00:00', '新しい順');
+  assert.strictEqual(r.total, 7, '空行を除いて7件');
+  assert.strictEqual(r.rows[0].timestamp, '2026/09/07 09:00:00', '新しい順');
 });
 
 check('末尾の空セルが省略された行でも、詳細は空文字になる', () => {
@@ -140,7 +142,7 @@ check('本文が JSON でなければ拒否', () => {
 check('authorize が行数をログに出す（中身は出さない）', () => {
   const ctx = load({ props: PROPS });
   ctx.sandbox.authorize();
-  assert.ok(ctx.logs.some((l) => l === '承認OK：回答シートの行数 = 8'));
+  assert.ok(ctx.logs.some((l) => l === '承認OK：回答シートの行数 = 9'));
   assert.ok(!ctx.logs.some((l) => l.includes('山田')));
 });
 
@@ -153,6 +155,7 @@ check('【実データの再現】列ずれで「状態」に入ったメール�
   const row = rowAt(r, '2026/09/03 09:00:00');
   assert.strictEqual(row.status, '[想定外の値]');
   assert.ok(row.warnings.some((w) => w.includes('状態')));
+  assert.strictEqual(row.content, '[列ずれのため非表示]', '列ずれした行の内容は出さない');
 });
 
 check('【実データの再現】「内容」がメールアドレスだけの行を伏せる', () => {
@@ -184,6 +187,30 @@ check('どの行のどの値にも、メールアドレスの形が残ってい�
   const r = post(load({ props: PROPS }), { token: 'secret-token', limit: 50 });
   const text = JSON.stringify(r.rows);
   assert.ok(!/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text), '残っている: ' + text);
+});
+
+check('【実データの再現 #16】お名前に日時が入った行で、日時欄を [氏名] にしない', () => {
+  const r = post(load({ props: PROPS }), { token: 'secret-token' });
+  const row = rowAt(r, '2026/09/07 09:00:00');
+  assert.ok(row, '日時欄が置き換わって行が見つからない（以前の誤り）');
+  assert.strictEqual(row.timestamp, '2026/09/07 09:00:00', '日時はそのまま');
+  assert.strictEqual(row.content, '[列ずれのため非表示]', '本文（本人の名前を含む）は出さない');
+  assert.ok(row.warnings.some((w) => w.includes('お名前')));
+  assert.ok(!JSON.stringify(row).includes('[氏名]'), '事実と違う目印を付けていない');
+});
+
+check('正常な行では、本文中の本人の氏名を引き続き伏せる', () => {
+  const r = post(load({ props: PROPS }), { token: 'secret-token' });
+  const row = rowAt(r, '2026/09/05 09:00:00');
+  assert.deepStrictEqual(row.warnings, []);
+  assert.ok(row.content.includes('[氏名]'));
+});
+
+check('タイムスタンプが日時の形でなければ伏せて列ずれ扱いにする', () => {
+  const values = [HEADER, ['山本', '2026/09/08', 'yamamoto@example.com', '内容', 'その他', '低', 'x@example.com', '完了', '']];
+  const r = post(load({ props: PROPS, values: values }), { token: 'secret-token' });
+  assert.strictEqual(r.rows[0].timestamp, '[想定外の値]');
+  assert.strictEqual(r.rows[0].content, '[列ずれのため非表示]');
 });
 
 console.log('\n' + passed + ' 件すべて成功');
