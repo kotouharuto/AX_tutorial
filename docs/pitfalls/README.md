@@ -54,3 +54,7 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 | [a5a-robots-404-means-allow](a5a-robots-404-means-allow.md) | A-5a | robots.txt が404だと「許可」と表示される。確認したことにならない | urllib.robotparser 利用時 |
 | [a5a-selector-break-is-silent](a5a-selector-break-is-silent.md) | A-5a | セレクタ破壊は例外を出さない。件数が正常なまま中身だけ空になり、差分検出も沈黙する | セレクタで抽出する実装すべて |
 | [a5a-launchd-scheduled-execution](a5a-launchd-scheduled-execution.md) | A-5a | 定期実行で3連続失敗。PATH・TCC（保護フォルダ）・iCloud 同期・venv ラッパーの絶対パス | macOS launchd / Windows タスクスケジューラ |
+| [a6a-mcp-sdk-v2-toolerror](a6a-mcp-sdk-v2-toolerror.md) | A-6a | MCP SDK v2 では ToolError 以外の例外の原因が Claude に届かない。FastMCP は import すらできない | MCP Python SDK 2.x |
+| [a6a-pii-column-filter-and-redaction](a6a-pii-column-filter-and-redaction.md) | A-6a | 個人情報を列で絞っても漏れた。値で伏せたら事実と違う目印を作った。列ずれした行は中身を出さない | 汚れた業務データを LLM に渡すとき |
+| [a6a-gas-webapp-constraints](a6a-gas-webapp-constraints.md) | A-6a | GAS ウェブアプリ：ヘッダが読めない・常に200・版が固定・SpreadsheetApp は readonly で動かない | Apps Script を外部から呼ぶ構成 |
+| [a6a-hand-edited-client-config](a6a-hand-edited-client-config.md) | A-6a | 設定ファイルの手編集で黙って壊れる：全角スペースで JSON が読めない・キー名の誤りは未設定扱い | 日本語環境・手で JSON を編集する手順 |

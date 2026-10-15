@@ -193,12 +193,54 @@ export CONTEXT7_API_KEY=<各自のキー>
 
 ### 自作の MCP サーバを追加する場合
 
+例：`projects/a6a-mcp-server`（社内文書の検索と問い合わせ記録の参照。Python・stdio）
+
 ```bash
-claude mcp add --transport stdio <サーバ名> --scope project -- <起動コマンド>
+claude mcp add <サーバ名> --scope project -e 変数名='${変数名}' -- <起動コマンド>
 ```
 
 `--scope project` を付けると `.mcp.json` に書かれ、チームに共有される。
 付けないと `~/.claude.json` に書かれ、**自分だけに効く**。
+
+> **サーバ名を先に書く。** `-e` は値を複数取る引数なので、`-e` の直後に名前を書くと
+> 名前まで環境変数として吸い込まれるおそれがある（2.1.231 のヘルプで確認）。
+
+#### `.mcp.json` に書くと、こうなる（実際に生成して確認した形）
+
+```json
+{
+  "mcpServers": {
+    "a6a-docs": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["--directory", "${A6A_SERVER_DIR}", "run", "src/server.py"],
+      "env": {
+        "A6A_CORPUS_DIR": "${A6A_CORPUS_DIR}",
+        "A6A_SHEET_API_URL": "${A6A_SHEET_API_URL}",
+        "A6A_SHEET_API_TOKEN": "${A6A_SHEET_API_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+- **絶対パスと秘密は `${変数名}` にする。** `.mcp.json` はコミットするファイルなので、
+  自分のパスやトークンを書くと、他のメンバーの環境で壊れるか、秘密が共有される
+- 値は各自がシェルの環境変数として設定する（`export A6A_SERVER_DIR=...`）
+- **Claude Desktop は `.mcp.json` を読まない。** Desktop で使うには、Desktop の設定ファイルに別途書く
+
+#### 自作サーバを作るときの注意（A-6a で踏んだもの）
+
+| 注意 | 理由 |
+|---|---|
+| 利用者に説明させたい失敗は **`ToolError`** で投げる | SDK v2 では、それ以外の例外の原因が Claude に届かない（「失敗した」だけになる） |
+| **標準出力に書かない**（`print` 禁止。ログは `logging` で標準エラー出力へ） | stdio では標準出力が通信路そのもの。壊れないこともあるが、入っても気づけないので静的に検査する |
+| 重い初期化は、起動時ではなく**最初の呼び出し時**に行う | 起動時に失敗すると「接続できない」としか出ない。Desktop は短時間に何度も起動する |
+| 書き込み・削除・外部送信をするツールには **`requiresUserInteraction`** を付ける | auto モードでは MCP ツールの実行を分類器が判定し、確認なしで動くことがある |
+| サーバの説明に、**保証できないことを書かない** | 「個人情報は含まれない」と書いたが、実データの列ずれで漏れていた |
+| 設定ファイルを手で編集させるなら、**値を出さずに検査する手段**も渡す | 全角スペースで JSON が読めなくなる・キー名の誤りは黙って未設定扱いになる |
+
+詳細：`docs/pitfalls/a6a-*.md`（4件）
 
 ---
 
