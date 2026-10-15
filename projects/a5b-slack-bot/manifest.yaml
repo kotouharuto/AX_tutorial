@@ -1,0 +1,31 @@
+# A-5b の Slack アプリのマニフェスト。
+# Slack の管理画面「Create New App → From an app manifest」にこの内容を貼る。
+#
+# 【権限は最小から始める】最初は commands（スラッシュコマンド）だけ。
+# 振り分け通知でチャンネルに投稿するときに chat:write を追加する。
+# その「追加して再インストールする前」の挙動を観察するため、あえて最初は入れない。
+display_information:
+  name: a5b-inquiry-bot
+  description: 社内問い合わせを分類して担当チャンネルに振り分ける（A-5b の検証用）
+
+features:
+  bot_user:
+    display_name: inquiry-bot
+    always_online: false
+  slash_commands:
+    # Socket Mode では url を書かない（WebSocket が公開 URL の代わりになる）
+    - command: /inquiry
+      description: 問い合わせを送る。分類して担当に振り分ける
+      usage_hint: "経費精算の締め日はいつですか？"
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - commands
+
+settings:
+  socket_mode_enabled: true
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false

@@ -1,0 +1,15 @@
+[project]
+name = "a5b-slack-bot"
+version = "0.1.0"
+description = "A-5b: Slack Bot（スラッシュコマンドで問い合わせを分類・振り分け）"
+requires-python = ">=3.11"
+dependencies = [
+    # 照合日 2026-10-16 時点の最新。メジャーの更新を勝手に取り込まないよう上限を付ける
+    "slack-bolt>=1.30,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.ruff]
+line-length = 100
