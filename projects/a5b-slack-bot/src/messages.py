@@ -49,3 +49,42 @@ def failure_message(reason: str) -> str:
         f"分類できませんでした（{reason}）。"
         "問い合わせは登録されていません。時間をおいてもう一度送るか、担当者に直接連絡してください。"
     )
+
+
+def notification_message(
+    result: Classification, text: str, user_id: str, is_fallback: bool
+) -> tuple[str, list[dict]]:
+    """担当チャンネルへの通知の文面。(代替テキスト, blocks) を返す。
+
+    送った人は <@ID> の形でメンションにする（名前を本文に書き写さない）。
+    """
+    head = "【担当未設定】" if is_fallback else ""
+    fallback = f"{head}新しい問い合わせ：{result.category}／緊急度 {result.urgency}"
+    body = (
+        f"{head}新しい問い合わせ（送信：<@{user_id}>）\n"
+        f"分類： *{result.category}* 　緊急度： *{result.urgency}* \n"
+        f"理由：{result.reason}"
+    )
+    if is_fallback:
+        body += "\n振り分け先が決まっていない分類のため、ここに届いています。担当を決めてください。"
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": body}},
+        # 問い合わせの本文は plain_text で出す（利用者の文の * や _ が書式として解釈されない）
+        {"type": "section", "text": {"type": "plain_text", "text": text[:2900]}},
+    ]
+    return fallback, blocks
+
+
+def routed_message(channel: str, is_fallback: bool) -> str:
+    """利用者に、どこへ通知したかを伝える文面。"""
+    if is_fallback:
+        return f"担当が決まっていない分類のため、<#{channel}> に回しました。担当者から連絡があります。"
+    return f"<#{channel}> の担当に通知しました。"
+
+
+def notify_failure_message(code: str) -> str:
+    """通知に失敗したことを利用者に伝える文面。"""
+    return (
+        f"分類はできましたが、担当への通知に失敗しました（{code}）。"
+        "問い合わせは担当に届いていません。担当者に直接連絡してください。"
+    )

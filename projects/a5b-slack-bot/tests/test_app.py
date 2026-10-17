@@ -19,6 +19,15 @@ from messages import ACCEPTED, EMPTY_GUIDE  # noqa: E402
 RESULT = Classification("申請手続き", "低", "締め日の確認", 2.8)
 
 
+def notify_ok(result: Classification, text: str, user_id: str) -> tuple[str, bool]:
+    """通知が成功する偽物。"""
+    return "C0SYSTEM01", False
+
+
+def run(text: str, rec: "Recorder", classify_fn, notify_fn=notify_ok, delay: float = 0.0) -> None:  # noqa: ANN001
+    app_mod.handle_inquiry(text, "U0USER0001", rec.ack, rec.respond, classify_fn, notify_fn, delay)
+
+
 class Recorder:
     """ack と respond の呼ばれた順序と時刻を記録する。"""
 
@@ -41,7 +50,7 @@ def test_ackを分類より先に呼ぶ() -> None:
         rec.calls.append(("classify", time.monotonic() - rec.started, {}))
         return RESULT
 
-    app_mod.handle_inquiry("経費精算の締め日は？", rec.ack, rec.respond, slow_classify)
+    run("経費精算の締め日は？", rec, slow_classify)
     assert [c[0] for c in rec.calls] == ["ack", "classify", "respond"]
     assert rec.calls[0][2]["args"] == (ACCEPTED,)
     assert rec.calls[0][1] < 0.1, "ack は分類を待たずにすぐ返す"
@@ -50,7 +59,7 @@ def test_ackを分類より先に呼ぶ() -> None:
 def test_分類が遅くてもackは遅れない() -> None:
     """観察用の遅延を入れても ack は即時。素朴な実装ではここが期限を超えていた。"""
     rec = Recorder()
-    app_mod.handle_inquiry("x", rec.ack, rec.respond, lambda t: RESULT, delay=0.5)
+    run("x", rec, lambda t: RESULT, delay=0.5)
     ack_time = next(c[1] for c in rec.calls if c[0] == "ack")
     respond_time = next(c[1] for c in rec.calls if c[0] == "respond")
     assert ack_time < 0.1
@@ -60,11 +69,11 @@ def test_分類が遅くてもackは遅れない() -> None:
 def test_結果はmrkdwnのblocksで送り代替テキストに書式記号を入れない() -> None:
     """素朴な実装ではアスタリスクが画面にそのまま出た。"""
     rec = Recorder()
-    app_mod.handle_inquiry("x", rec.ack, rec.respond, lambda t: RESULT)
+    run("x", rec, lambda t: RESULT)
     sent = rec.calls[-1][2]
     assert sent["blocks"][0]["text"]["type"] == "mrkdwn"
     assert "*申請手続き*" in sent["blocks"][0]["text"]["text"]
-    assert "*" not in sent["text"], "代替テキスト（通知に出る）に書式記号を入れない"
+    assert "*" not in sent["text"].split("<#")[0], "代替テキスト（通知に出る）に書式記号を入れない"
 
 
 def test_分類の失敗は改めて利用者に伝える() -> None:
@@ -74,7 +83,7 @@ def test_分類の失敗は改めて利用者に伝える() -> None:
     def failing(text: str) -> Classification:
         raise ClassificationError("Gemini が HTTP 402 を返した")
 
-    app_mod.handle_inquiry("x", rec.ack, rec.respond, failing)
+    run("x", rec, failing)
     message = rec.calls[-1][2]["text"]
     assert "分類できませんでした" in message
     assert "402" in message
@@ -87,7 +96,7 @@ def test_本文が空なら分類せず案内だけ返す() -> None:
     def must_not_call(text: str) -> Classification:
         raise AssertionError("空の本文で分類を呼んではいけない")
 
-    app_mod.handle_inquiry("   ", rec.ack, rec.respond, must_not_call)
+    run("   ", rec, must_not_call)
     assert [c[0] for c in rec.calls] == ["ack"]
     assert rec.calls[0][2]["args"] == (EMPTY_GUIDE,)
 
@@ -127,3 +136,67 @@ def test_見えない文字を本文に入れない() -> None:
     fallback, blocks = result_message(RESULT)
     for text in (fallback, blocks[0]["text"]["text"]):
         assert "\u200b" not in text
+
+
+
+def test_通知先を利用者に伝える() -> None:
+    rec = Recorder()
+    run("x", rec, lambda t: RESULT)
+    sent = rec.calls[-1][2]
+    assert "<#C0SYSTEM01>" in sent["text"]
+    assert sent["blocks"][-1]["type"] == "context"
+
+
+def test_通知に失敗したら担当に届いていないと伝える() -> None:
+    """【素朴な実装】利用者には伝える。運用者への通知は到達条件4で足す。"""
+    from notifier import NotifyError
+
+    rec = Recorder()
+
+    def failing_notify(result: Classification, text: str, user_id: str) -> tuple[str, bool]:
+        raise NotifyError("missing_scope", "C0SYSTEM01")
+
+    run("x", rec, lambda t: RESULT, notify_fn=failing_notify)
+    message = rec.calls[-1][2]["text"]
+    assert "missing_scope" in message
+    assert "届いていません" in message
+
+
+def test_分類に失敗したら通知しない() -> None:
+    rec = Recorder()
+
+    def failing(text: str) -> Classification:
+        raise ClassificationError("x")
+
+    def must_not_notify(result: Classification, text: str, user_id: str) -> tuple[str, bool]:
+        raise AssertionError("分類に失敗したのに通知してはいけない")
+
+    run("x", rec, failing, notify_fn=must_not_notify)
+
+
+
+def test_通知の失敗は画面に出るblocksに入れる() -> None:
+    """**blocks があると text は画面に表示されない。** 失敗を text にだけ入れると、
+    利用者には分類結果しか見えず「担当に届いた」と思い込む（実機で起きた）。"""
+    from notifier import NotifyError
+
+    rec = Recorder()
+
+    def failing_notify(result: Classification, text: str, user_id: str) -> tuple[str, bool]:
+        raise NotifyError("missing_scope", "C0SYSTEM01")
+
+    run("x", rec, lambda t: RESULT, notify_fn=failing_notify)
+    shown = " ".join(b["text"]["text"] for b in rec.calls[-1][2]["blocks"] if "text" in b)
+    assert "missing_scope" in shown, "失敗が画面に出る blocks に入っていない"
+    assert "届いていません" in shown
+
+
+def test_画面に出す情報はすべてblocksにある() -> None:
+    """成功時も、通知先の案内が blocks（context）にあること。"""
+    rec = Recorder()
+    run("x", rec, lambda t: RESULT)
+    blocks = rec.calls[-1][2]["blocks"]
+    shown = " ".join(
+        e["text"] for b in blocks for e in b.get("elements", []) if "text" in e
+    ) + " ".join(b["text"]["text"] for b in blocks if "text" in b)
+    assert "<#C0SYSTEM01>" in shown

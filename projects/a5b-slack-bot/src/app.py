@@ -22,7 +22,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from classifier import Classification, ClassificationError, classify  # noqa: E402
-from messages import ACCEPTED, EMPTY_GUIDE, failure_message, result_message  # noqa: E402
+from messages import (  # noqa: E402
+    ACCEPTED,
+    EMPTY_GUIDE,
+    failure_message,
+    notify_failure_message,
+    result_message,
+    routed_message,
+)
+from notifier import NotifyError  # noqa: E402
 
 # ログは標準エラー出力へ。**問い合わせの本文は出さない**（個人情報が入りうる）
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -40,14 +48,16 @@ def simulated_delay() -> float:
 
 def handle_inquiry(
     text: str,
+    user_id: str,
     ack: Callable[..., object],
     respond: Callable[..., object],
     classify_fn: Callable[[str], Classification],
+    notify_fn: Callable[[Classification, str, str], tuple[str, bool]],
     delay: float = 0.0,
 ) -> None:
     """問い合わせを処理する。Slack に依存しない形にして、テストから呼べるようにしている。
 
-    順序が要点：**ack を最初に呼ぶ。** 分類はそのあと。
+    順序が要点：**ack を最初に呼ぶ。** 分類と通知はそのあと。
     """
     started = time.monotonic()
     if not text.strip():
@@ -68,27 +78,54 @@ def handle_inquiry(
         return
 
     fallback, blocks = result_message(result)
-    respond(text=fallback, blocks=blocks)
-    logger.info("結果を送った：受信から %.2f 秒（Gemini %.2f 秒）", time.monotonic() - started, result.elapsed)
+    try:
+        channel, is_fallback = notify_fn(result, text, user_id)
+    except NotifyError as exc:
+        # 【素朴な実装】利用者には失敗を伝えるが、運用者への通知はまだ無い（到達条件4で足す）
+        logger.error("通知の失敗：%s", exc)
+        # **blocks があると text は画面に出ない。** 失敗の文は必ず blocks に入れる。
+        # 当初 text にだけ入れており、利用者には分類結果しか見えず「届いた」と思い込む状態だった
+        warning = notify_failure_message(exc.code)
+        respond(
+            text=fallback + "\n" + warning,
+            blocks=blocks + [{"type": "section", "text": {"type": "mrkdwn", "text": ":warning: " + warning}}],
+        )
+        return
+
+    respond(
+        text=fallback + "\n" + routed_message(channel, is_fallback),
+        blocks=blocks + [
+            {"type": "context", "elements": [{"type": "mrkdwn", "text": routed_message(channel, is_fallback)}]}
+        ],
+    )
+    logger.info(
+        "結果を送った：受信から %.2f 秒（Gemini %.2f 秒）・通知先 %s%s",
+        time.monotonic() - started, result.elapsed, channel, "（予備）" if is_fallback else "",
+    )
 
 
 def build_app():  # noqa: ANN201  Slack の App を返す
     """Slack の App を組み立てる。起動時にだけ設定とトークンを読む。"""
     from slack_bolt import App
 
+    from notifier import post_notification
+    from routing import load_routing
     from settings import load_settings
 
     settings = load_settings()
+    routing = load_routing()  # 設定の誤りは起動時に止める（黙って届かない状態を作らない）
     app = App(token=settings.slack_bot_token)
     delay = simulated_delay()
 
     @app.command("/inquiry")
-    def on_inquiry(ack, command, respond) -> None:  # noqa: ANN001  Bolt が引数名で値を渡す
+    def on_inquiry(ack, command, respond, client) -> None:  # noqa: ANN001  Bolt が引数名で値を渡す
         handle_inquiry(
             command.get("text", ""),
+            command.get("user_id", ""),
             ack,
             respond,
             lambda t: classify(t, settings.gemini_api_key),
+            lambda r, t, u: post_notification(client, routing, r, t, u),
             delay,
         )
 
