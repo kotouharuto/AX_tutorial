@@ -1,0 +1,129 @@
+"""Bot の処理の順序のテスト。Slack と Gemini には接続しない。
+
+**ack を最初に呼ぶこと**を固定する。素朴な実装（分類が終わってから ack）は
+3秒の期限を超えて「失敗しました。もう一度試すか…」と出し、遅れて結果も出していた。
+"""
+
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+import app as app_mod  # noqa: E402
+from classifier import Classification, ClassificationError  # noqa: E402
+from messages import ACCEPTED, EMPTY_GUIDE  # noqa: E402
+
+RESULT = Classification("申請手続き", "低", "締め日の確認", 2.8)
+
+
+class Recorder:
+    """ack と respond の呼ばれた順序と時刻を記録する。"""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, float, dict]] = []
+        self.started = time.monotonic()
+
+    def ack(self, *args: object, **kwargs: object) -> None:
+        self.calls.append(("ack", time.monotonic() - self.started, {"args": args, **kwargs}))
+
+    def respond(self, **kwargs: object) -> None:
+        self.calls.append(("respond", time.monotonic() - self.started, kwargs))
+
+
+def test_ackを分類より先に呼ぶ() -> None:
+    rec = Recorder()
+
+    def slow_classify(text: str) -> Classification:
+        time.sleep(0.3)  # 分類に時間がかかる状況
+        rec.calls.append(("classify", time.monotonic() - rec.started, {}))
+        return RESULT
+
+    app_mod.handle_inquiry("経費精算の締め日は？", rec.ack, rec.respond, slow_classify)
+    assert [c[0] for c in rec.calls] == ["ack", "classify", "respond"]
+    assert rec.calls[0][2]["args"] == (ACCEPTED,)
+    assert rec.calls[0][1] < 0.1, "ack は分類を待たずにすぐ返す"
+
+
+def test_分類が遅くてもackは遅れない() -> None:
+    """観察用の遅延を入れても ack は即時。素朴な実装ではここが期限を超えていた。"""
+    rec = Recorder()
+    app_mod.handle_inquiry("x", rec.ack, rec.respond, lambda t: RESULT, delay=0.5)
+    ack_time = next(c[1] for c in rec.calls if c[0] == "ack")
+    respond_time = next(c[1] for c in rec.calls if c[0] == "respond")
+    assert ack_time < 0.1
+    assert respond_time >= 0.5
+
+
+def test_結果はmrkdwnのblocksで送り代替テキストに書式記号を入れない() -> None:
+    """素朴な実装ではアスタリスクが画面にそのまま出た。"""
+    rec = Recorder()
+    app_mod.handle_inquiry("x", rec.ack, rec.respond, lambda t: RESULT)
+    sent = rec.calls[-1][2]
+    assert sent["blocks"][0]["text"]["type"] == "mrkdwn"
+    assert "*申請手続き*" in sent["blocks"][0]["text"]["text"]
+    assert "*" not in sent["text"], "代替テキスト（通知に出る）に書式記号を入れない"
+
+
+def test_分類の失敗は改めて利用者に伝える() -> None:
+    """「受け付けました」を出した後なので、失敗したことを明確に伝える。"""
+    rec = Recorder()
+
+    def failing(text: str) -> Classification:
+        raise ClassificationError("Gemini が HTTP 402 を返した")
+
+    app_mod.handle_inquiry("x", rec.ack, rec.respond, failing)
+    message = rec.calls[-1][2]["text"]
+    assert "分類できませんでした" in message
+    assert "402" in message
+    assert "登録されていません" in message
+
+
+def test_本文が空なら分類せず案内だけ返す() -> None:
+    rec = Recorder()
+
+    def must_not_call(text: str) -> Classification:
+        raise AssertionError("空の本文で分類を呼んではいけない")
+
+    app_mod.handle_inquiry("   ", rec.ack, rec.respond, must_not_call)
+    assert [c[0] for c in rec.calls] == ["ack"]
+    assert rec.calls[0][2]["args"] == (EMPTY_GUIDE,)
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("", 0.0), ("4", 4.0), ("0.5", 0.5)])
+def test_観察用の遅延を読む(raw: str, expected: float, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("A5B_SIMULATED_DELAY_SEC", raw)
+    assert app_mod.simulated_delay() == expected
+
+
+def test_観察用の遅延が数値でなければ止める(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("A5B_SIMULATED_DELAY_SEC", "四")
+    with pytest.raises(SystemExit):
+        app_mod.simulated_delay()
+
+
+
+def test_太字の記号の前後は半角スペースか行の端() -> None:
+    """全角の「：」や全角スペースに * が直接くっつくと、Slack で太字にならない（実機で確認）。"""
+    import re
+
+    from messages import result_message
+
+    _, blocks = result_message(RESULT)
+    text = blocks[0]["text"]["text"]
+    for match in re.finditer(r"\*[^*\n]+\*", text):
+        before = text[match.start() - 1] if match.start() > 0 else "\n"
+        after = text[match.end()] if match.end() < len(text) else "\n"
+        assert before in " \n", f"開きの * の前が {before!r}"
+        assert after in " \n", f"閉じの * の後ろが {after!r}"
+
+
+def test_見えない文字を本文に入れない() -> None:
+    """ゼロ幅スペースでも太字になるが、コピーした文に紛れ込むので使わない。"""
+    from messages import result_message
+
+    fallback, blocks = result_message(RESULT)
+    for text in (fallback, blocks[0]["text"]["text"]):
+        assert "\u200b" not in text
