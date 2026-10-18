@@ -40,14 +40,20 @@ def result_message(result: Classification) -> tuple[str, list[dict]]:
     return fallback, blocks
 
 
-def failure_message(reason: str) -> str:
+def failure_message(reason: str, alerted: bool) -> str:
     """分類に失敗したときの文面。利用者が次に何をすればよいかまで書く。
 
     「受け付けました」を既に出しているので、失敗したことを改めて明確に伝える。
+    運用担当に知らせられたかどうかで、利用者に求める行動を変える。
     """
+    if alerted:
+        return (
+            f"分類できませんでした（{reason}）。"
+            "運用担当に知らせたので、手で振り分けられます。もう一度送る必要はありません。"
+        )
     return (
-        f"分類できませんでした（{reason}）。"
-        "問い合わせは登録されていません。時間をおいてもう一度送るか、担当者に直接連絡してください。"
+        f"分類できませんでした（{reason}）。運用担当にも連絡できませんでした。"
+        "問い合わせは担当に届いていません。担当者に直接連絡してください。"
     )
 
 
@@ -82,9 +88,48 @@ def routed_message(channel: str, is_fallback: bool) -> str:
     return f"<#{channel}> の担当に通知しました。"
 
 
-def notify_failure_message(code: str) -> str:
+def notify_failure_message(code: str, alerted: bool) -> str:
     """通知に失敗したことを利用者に伝える文面。"""
+    if alerted:
+        return (
+            f"分類はできましたが、担当への通知に失敗しました（{code}）。"
+            "運用担当に知らせたので、手で振り分けられます。もう一度送る必要はありません。"
+        )
     return (
-        f"分類はできましたが、担当への通知に失敗しました（{code}）。"
+        f"分類はできましたが、担当への通知に失敗しました（{code}）。運用担当にも連絡できませんでした。"
         "問い合わせは担当に届いていません。担当者に直接連絡してください。"
     )
+
+
+# Slack のエラーの種類ごとの直し方。A-5b で実際に踏んだ順に並べている
+FIX_HINTS = {
+    "missing_scope": (
+        "アプリの権限が足りない。マニフェストに権限を足し、**アプリを再インストールする**"
+        "（足して保存しただけでは効かない）"
+    ),
+    "not_in_channel": "Bot が通知先のチャンネルに入っていない。そのチャンネルで `/invite @inquiry-bot`",
+    "channel_not_found": "通知先のチャンネルが見つからない。`routing.json` のチャンネル ID を確認する",
+    "is_archived": "通知先のチャンネルがアーカイブされている。`routing.json` の通知先を変える",
+}
+
+
+def ops_alert_message(
+    kind: str, detail: str, user_id: str, text: str, error: object = None
+) -> tuple[str, list[dict]]:
+    """運用者のチャンネルに出す失敗の通知。手で対応できるだけの情報を入れる。"""
+    code = getattr(error, "code", "")
+    lines = [
+        f":rotating_light: *{kind}* （送信：<@{user_id}>）",
+        f"原因：{detail}",
+    ]
+    if code in FIX_HINTS:
+        lines.append(f"直し方：{FIX_HINTS[code]}")
+    needed, provided = getattr(error, "needed", ""), getattr(error, "provided", "")
+    if needed or provided:
+        lines.append(f"必要な権限：{needed or '不明'}　トークンの権限：{provided or '不明'}")
+    lines.append("下の問い合わせを手で振り分けてください。")
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}},
+        {"type": "section", "text": {"type": "plain_text", "text": text[:2900] or "（本文なし）"}},
+    ]
+    return f"{kind}：{detail}", blocks

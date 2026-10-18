@@ -8,7 +8,7 @@
 from slack_sdk.errors import SlackApiError
 
 from classifier import Classification
-from messages import notification_message
+from messages import notification_message, ops_alert_message
 from routing import Routing
 
 
@@ -50,3 +50,25 @@ def post_notification(
             provided=str(response.get("provided", "") or ""),
         ) from None
     return channel, is_fallback
+
+
+def post_ops_alert(
+    client,  # noqa: ANN001  slack_sdk の WebClient
+    routing: Routing,
+    kind: str,
+    detail: str,
+    user_id: str,
+    text: str,
+    error: "NotifyError | None" = None,
+) -> bool:
+    """失敗を運用者のチャンネルに知らせる。送れたら True。
+
+    **ここでの失敗は例外にしない。** 運用者への通知は最後の手段なので、
+    これが失敗したら呼び出し側がログに残し、利用者に「運用担当にも連絡できなかった」と伝える。
+    """
+    fallback, blocks = ops_alert_message(kind, detail, user_id, text, error)
+    try:
+        client.chat_postMessage(channel=routing.ops, text=fallback, blocks=blocks)
+    except SlackApiError:
+        return False
+    return True

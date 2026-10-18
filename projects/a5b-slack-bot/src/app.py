@@ -53,6 +53,7 @@ def handle_inquiry(
     respond: Callable[..., object],
     classify_fn: Callable[[str], Classification],
     notify_fn: Callable[[Classification, str, str], tuple[str, bool]],
+    alert_fn: Callable[..., bool],
     delay: float = 0.0,
 ) -> None:
     """問い合わせを処理する。Slack に依存しない形にして、テストから呼べるようにしている。
@@ -74,18 +75,23 @@ def handle_inquiry(
         result = classify_fn(text)
     except ClassificationError as exc:
         logger.warning("分類の失敗：%s", exc)
-        respond(text=failure_message(str(exc)))
+        alerted = alert_fn("分類の失敗", str(exc), user_id, text)
+        if not alerted:
+            logger.error("運用者への通知も失敗した（分類の失敗）")
+        respond(text=failure_message(str(exc), alerted))
         return
 
     fallback, blocks = result_message(result)
     try:
         channel, is_fallback = notify_fn(result, text, user_id)
     except NotifyError as exc:
-        # 【素朴な実装】利用者には失敗を伝えるが、運用者への通知はまだ無い（到達条件4で足す）
         logger.error("通知の失敗：%s", exc)
+        alerted = alert_fn("通知の失敗", str(exc), user_id, text, exc)
+        if not alerted:
+            logger.error("運用者への通知も失敗した（通知の失敗）")
         # **blocks があると text は画面に出ない。** 失敗の文は必ず blocks に入れる。
         # 当初 text にだけ入れており、利用者には分類結果しか見えず「届いた」と思い込む状態だった
-        warning = notify_failure_message(exc.code)
+        warning = notify_failure_message(exc.code, alerted)
         respond(
             text=fallback + "\n" + warning,
             blocks=blocks + [{"type": "section", "text": {"type": "mrkdwn", "text": ":warning: " + warning}}],
@@ -108,7 +114,7 @@ def build_app():  # noqa: ANN201  Slack の App を返す
     """Slack の App を組み立てる。起動時にだけ設定とトークンを読む。"""
     from slack_bolt import App
 
-    from notifier import post_notification
+    from notifier import post_notification, post_ops_alert
     from routing import load_routing
     from settings import load_settings
 
@@ -126,6 +132,7 @@ def build_app():  # noqa: ANN201  Slack の App を返す
             respond,
             lambda t: classify(t, settings.gemini_api_key),
             lambda r, t, u: post_notification(client, routing, r, t, u),
+            lambda kind, detail, u, t, err=None: post_ops_alert(client, routing, kind, detail, u, t, err),
             delay,
         )
 

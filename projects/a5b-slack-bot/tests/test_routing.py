@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from classifier import Classification  # noqa: E402
-from notifier import NotifyError, post_notification  # noqa: E402
+from notifier import NotifyError, post_notification, post_ops_alert  # noqa: E402
 from routing import Routing, RoutingError, load_routing  # noqa: E402
 from slack_sdk.errors import SlackApiError  # noqa: E402
 
@@ -135,3 +135,35 @@ def test_権限不足のときは必要な権限と今の権限を残す() -> No
     assert exc.value.needed == "chat:write"
     assert exc.value.provided == "commands"
     assert "トークンの権限：commands" in str(exc.value)
+
+
+
+# --- 運用者への通知 -----------------------------------------------------------------
+
+
+def test_運用者のチャンネルに直し方付きで知らせる() -> None:
+    client = FakeClient()
+    error = NotifyError("missing_scope", "C0SYSTEM01", needed="chat:write", provided="commands")
+    assert post_ops_alert(client, ROUTING, "通知の失敗", str(error), "U0USER0001", "VPN", error)
+    sent = client.posted[0]
+    assert sent["channel"] == "C0OPS00001"
+    body = sent["blocks"][0]["text"]["text"]
+    assert "再インストール" in body, "missing_scope の直し方が書かれていない"
+    assert "トークンの権限：commands" in body
+    assert sent["blocks"][1]["text"]["text"] == "VPN", "手で振り分けられるよう本文を付ける"
+
+
+@pytest.mark.parametrize(
+    ("code", "hint"),
+    [("not_in_channel", "/invite"), ("channel_not_found", "routing.json")],
+)
+def test_エラーの種類ごとに直し方を変える(code: str, hint: str) -> None:
+    client = FakeClient()
+    error = NotifyError(code, "C0SYSTEM01")
+    post_ops_alert(client, ROUTING, "通知の失敗", str(error), "U0USER0001", "x", error)
+    assert hint in client.posted[0]["blocks"][0]["text"]["text"]
+
+
+def test_運用者への通知が失敗しても例外にしない() -> None:
+    """最後の手段なので、呼び出し側が False を受けてログと利用者への連絡に回す。"""
+    assert post_ops_alert(FakeClient(error="not_in_channel"), ROUTING, "x", "x", "U", "x") is False

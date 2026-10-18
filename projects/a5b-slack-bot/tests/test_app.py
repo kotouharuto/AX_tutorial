@@ -24,8 +24,26 @@ def notify_ok(result: Classification, text: str, user_id: str) -> tuple[str, boo
     return "C0SYSTEM01", False
 
 
-def run(text: str, rec: "Recorder", classify_fn, notify_fn=notify_ok, delay: float = 0.0) -> None:  # noqa: ANN001
-    app_mod.handle_inquiry(text, "U0USER0001", rec.ack, rec.respond, classify_fn, notify_fn, delay)
+class Alerts:
+    """運用者への通知を記録する偽物。ok=False なら送れなかったことにする。"""
+
+    def __init__(self, ok: bool = True) -> None:
+        self.ok = ok
+        self.sent: list[tuple] = []
+
+    def __call__(self, kind: str, detail: str, user_id: str, text: str, error: object = None) -> bool:
+        self.sent.append((kind, detail, user_id, text, error))
+        return self.ok
+
+
+def run(  # noqa: ANN001
+    text: str, rec: "Recorder", classify_fn, notify_fn=notify_ok, delay: float = 0.0, alerts=None
+) -> "Alerts":
+    alerts = alerts if alerts is not None else Alerts()
+    app_mod.handle_inquiry(
+        text, "U0USER0001", rec.ack, rec.respond, classify_fn, notify_fn, alerts, delay
+    )
+    return alerts
 
 
 class Recorder:
@@ -83,11 +101,12 @@ def test_分類の失敗は改めて利用者に伝える() -> None:
     def failing(text: str) -> Classification:
         raise ClassificationError("Gemini が HTTP 402 を返した")
 
-    run("x", rec, failing)
+    alerts = run("x", rec, failing)
     message = rec.calls[-1][2]["text"]
     assert "分類できませんでした" in message
     assert "402" in message
-    assert "登録されていません" in message
+    assert "運用担当に知らせた" in message
+    assert alerts.sent[0][0] == "分類の失敗"
 
 
 def test_本文が空なら分類せず案内だけ返す() -> None:
@@ -159,7 +178,7 @@ def test_通知に失敗したら担当に届いていないと伝える() -> No
     run("x", rec, lambda t: RESULT, notify_fn=failing_notify)
     message = rec.calls[-1][2]["text"]
     assert "missing_scope" in message
-    assert "届いていません" in message
+    assert "通知に失敗しました" in message
 
 
 def test_分類に失敗したら通知しない() -> None:
@@ -188,7 +207,7 @@ def test_通知の失敗は画面に出るblocksに入れる() -> None:
     run("x", rec, lambda t: RESULT, notify_fn=failing_notify)
     shown = " ".join(b["text"]["text"] for b in rec.calls[-1][2]["blocks"] if "text" in b)
     assert "missing_scope" in shown, "失敗が画面に出る blocks に入っていない"
-    assert "届いていません" in shown
+    assert "通知に失敗しました" in shown
 
 
 def test_画面に出す情報はすべてblocksにある() -> None:
@@ -200,3 +219,44 @@ def test_画面に出す情報はすべてblocksにある() -> None:
         e["text"] for b in blocks for e in b.get("elements", []) if "text" in e
     ) + " ".join(b["text"]["text"] for b in blocks if "text" in b)
     assert "<#C0SYSTEM01>" in shown
+
+
+
+# --- 到達条件4：失敗時の通知経路 ------------------------------------------------
+
+
+def test_通知に失敗したら運用者に原因付きで知らせる() -> None:
+    from notifier import NotifyError
+
+    rec = Recorder()
+    error = NotifyError("not_in_channel", "C0SYSTEM01")
+
+    def failing_notify(result: Classification, text: str, user_id: str) -> tuple[str, bool]:
+        raise error
+
+    alerts = run("VPN に繋がらない", rec, lambda t: RESULT, notify_fn=failing_notify)
+    kind, detail, user_id, text, err = alerts.sent[0]
+    assert kind == "通知の失敗"
+    assert "not_in_channel" in detail
+    assert (user_id, text, err) == ("U0USER0001", "VPN に繋がらない", error)
+    shown = " ".join(b["text"]["text"] for b in rec.calls[-1][2]["blocks"] if "text" in b)
+    assert "運用担当に知らせた" in shown
+
+
+def test_運用者への通知も失敗したら利用者に直接連絡を求める() -> None:
+    """最後の手段。利用者に「届いていない」と明確に伝える。"""
+    rec = Recorder()
+
+    def failing(text: str) -> Classification:
+        raise ClassificationError("Gemini が HTTP 402 を返した")
+
+    run("x", rec, failing, alerts=Alerts(ok=False))
+    message = rec.calls[-1][2]["text"]
+    assert "運用担当にも連絡できませんでした" in message
+    assert "担当者に直接連絡" in message
+
+
+def test_成功したときは運用者に知らせない() -> None:
+    rec = Recorder()
+    alerts = run("x", rec, lambda t: RESULT)
+    assert alerts.sent == []
