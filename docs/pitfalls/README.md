@@ -54,6 +54,11 @@ Phase A 完了条件のひとつであり、Phase B での納品物・提案材�
 | [a5a-robots-404-means-allow](a5a-robots-404-means-allow.md) | A-5a | robots.txt が404だと「許可」と表示される。確認したことにならない | urllib.robotparser 利用時 |
 | [a5a-selector-break-is-silent](a5a-selector-break-is-silent.md) | A-5a | セレクタ破壊は例外を出さない。件数が正常なまま中身だけ空になり、差分検出も沈黙する | セレクタで抽出する実装すべて |
 | [a5a-launchd-scheduled-execution](a5a-launchd-scheduled-execution.md) | A-5a | 定期実行で3連続失敗。PATH・TCC（保護フォルダ）・iCloud 同期・venv ラッパーの絶対パス | macOS launchd / Windows タスクスケジューラ |
+| [a5b-slash-command-3sec-ack](a5b-slash-command-3sec-ack.md) | A-5b | LLM を待ってから ack すると3秒期限を超え、「失敗」と「結果」が両方出る。Bolt のログは原因を指さない | Slack のスラッシュコマンド全般 |
+| [a5b-scope-needs-reinstall](a5b-scope-needs-reinstall.md) | A-5b | マニフェストに権限を足しても再インストールまで効かず、エラーも同じ。権限名も一致しない | Slack アプリの権限変更 |
+| [a5b-slack-message-display](a5b-slack-message-display.md) | A-5b | 日本語で `*` が全角に接すると太字にならない。blocks があると text は画面に出ない | 日本語の Slack メッセージ |
+| [a5b-socket-mode-zombie-connection](a5b-socket-mode-zombie-connection.md) | A-5b | プロセスは生きたまま接続だけ約7時間45分壊れ続けた。接続を見張って終了し launchd に起動し直させる | 常駐する Socket Mode の Bot |
+| [a5b-gemini-prepaid-402](a5b-gemini-prepaid-402.md) | A-5b | キーは正しいのに Gemini が 402。前払いへの切り替えを求めて拒否（A-1 も影響） | Gemini API の有料利用 |
 | [a6a-mcp-sdk-v2-toolerror](a6a-mcp-sdk-v2-toolerror.md) | A-6a | MCP SDK v2 では ToolError 以外の例外の原因が Claude に届かない。FastMCP は import すらできない | MCP Python SDK 2.x |
 | [a6a-pii-column-filter-and-redaction](a6a-pii-column-filter-and-redaction.md) | A-6a | 個人情報を列で絞っても漏れた。値で伏せたら事実と違う目印を作った。列ずれした行は中身を出さない | 汚れた業務データを LLM に渡すとき |
 | [a6a-gas-webapp-constraints](a6a-gas-webapp-constraints.md) | A-6a | GAS ウェブアプリ：ヘッダが読めない・常に200・版が固定・SpreadsheetApp は readonly で動かない | Apps Script を外部から呼ぶ構成 |

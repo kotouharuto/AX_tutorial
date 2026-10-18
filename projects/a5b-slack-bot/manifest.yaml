@@ -1,9 +1,11 @@
 # A-5b の Slack アプリのマニフェスト。
 # Slack の管理画面「Create New App → From an app manifest」にこの内容を貼る。
 #
-# 【権限は最小から始める】最初は commands（スラッシュコマンド）だけ。
-# 振り分け通知でチャンネルに投稿するときに chat:write を追加する。
-# その「追加して再インストールする前」の挙動を観察するため、あえて最初は入れない。
+# 【権限は最小にする】
+# - commands：スラッシュコマンド
+# - chat:write：担当チャンネルと #inq-ops への通知（2026-10-17 に追加）
+# 権限を足したら、保存だけでなく**アプリの再インストール**と
+# 投稿先チャンネルへの /invite が要る（HANDOVER.md 4章）。
 display_information:
   name: a5b-inquiry-bot
   description: 社内問い合わせを分類して担当チャンネルに振り分ける（A-5b の検証用）
@@ -23,6 +25,7 @@ oauth_config:
   scopes:
     bot:
       - commands
+      - chat:write
 
 settings:
   socket_mode_enabled: true

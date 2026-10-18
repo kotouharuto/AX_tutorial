@@ -62,8 +62,8 @@ Socket Mode（公開 URL なしで動かす方式）の接続に使うトーク�
 2. 「**Install to （ワークスペース名）**」→ 権限の確認画面で「**許可する**」
 3. 表示された **`xoxb-` で始まる Bot User OAuth Token** を控える
 
-**承認画面で要求されている権限を読む。** 今は「スラッシュコマンドの追加」に当たる1つだけのはず
-（マニフェストで `commands` だけにしている）。
+**承認画面で要求されている権限を読む。** 「スラッシュコマンドの追加」と「メッセージの送信」に当たる2つのはず
+（マニフェストの `commands` と `chat:write`）。
 
 ---
 
@@ -106,9 +106,10 @@ uv run python src/settings.py
 
 ---
 
-## 6. Bot をチャンネルに招待する（1分）
+## 6. Bot をチャンネルに招待する（3分）
 
-Slack の `#inquiry-test` で次を送る。
+`routing.json` に書いた通知先のチャンネル（`#inq-system`・`#inq-general`・`#inq-ops`）を作り、
+それぞれで次を送る。**招待していないチャンネルには通知できない**（`not_in_channel`）。
 
 ```
 /invite @inquiry-bot
