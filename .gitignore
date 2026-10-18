@@ -49,6 +49,7 @@ projects/a2-rag/systems/custom/results/
 projects/a4-python-batch/input/
 projects/a4-python-batch/output/
 projects/a5a-scraping/output/
+projects/a5b-slack-bot/output/
 
 # ===== A-2 生成物（generate.py で再生成可能・シード固定） =====
 projects/a2-rag/corpus/out/

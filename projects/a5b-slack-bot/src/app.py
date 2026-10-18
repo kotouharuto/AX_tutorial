@@ -37,13 +37,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("a5b")
 
 
-def simulated_delay() -> float:
-    """観察専用の遅延（秒）。数値でなければ止める（黙って 0 として扱わない）。"""
-    raw = os.environ.get("A5B_SIMULATED_DELAY_SEC", "0").strip() or "0"
+def env_seconds(name: str, default: float) -> float:
+    """秒数の設定を環境変数から読む。数値でなければ止める（黙って既定値として扱わない）。"""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
     try:
         return float(raw)
     except ValueError:
-        raise SystemExit(f"A5B_SIMULATED_DELAY_SEC が数値ではない：{raw!r}") from None
+        raise SystemExit(f"{name} が数値ではない：{raw!r}") from None
+
+
+def simulated_delay() -> float:
+    """観察専用の遅延（秒）。本番では使わない。"""
+    return env_seconds("A5B_SIMULATED_DELAY_SEC", 0.0)
 
 
 def handle_inquiry(
@@ -136,16 +143,66 @@ def build_app():  # noqa: ANN201  Slack の App を返す
             delay,
         )
 
-    return app, settings
+    return app, settings, routing
+
+
+def post_to_ops(client, channel: str, text: str) -> bool:  # noqa: ANN001
+    """運用者のチャンネルに送る。送れなければ False（例外は投げない。理由はログに残す）。
+
+    接続が切れているときに呼ぶこともあるので、ネットワークの失敗も含めて受け止める。
+    """
+    try:
+        client.chat_postMessage(channel=channel, text=text)
+    except Exception as exc:  # noqa: BLE001  ネットワーク断を含め、何であっても終了処理を止めない
+        logger.error("運用者への通知に失敗：%s: %s", type(exc).__name__, exc)
+        return False
+    return True
+
+
+def announce_previous_exit(client, channel: str) -> None:  # noqa: ANN001
+    """前回、接続が切れて終了していたら知らせる。送れたら記録を消す（送れなければ次回また試す）。"""
+    from messages import restart_notice_message
+    from watchdog import clear_marker, read_marker
+
+    record = read_marker()
+    if record is None:
+        return
+    logger.warning("前回の終了：%s に接続が %s 秒切れていた", record.at, record.down_sec)
+    if post_to_ops(client, channel, restart_notice_message(record.at, record.down_sec)):
+        clear_marker()
 
 
 def main() -> None:
-    """Socket Mode で接続して待ち受ける。"""
+    """Socket Mode で接続し、接続を見張りながら待つ。"""
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-    app, settings = build_app()
-    logger.info("起動：観察用の遅延 %.1f 秒", simulated_delay())
-    SocketModeHandler(app, settings.slack_app_token).start()
+    from messages import watchdog_alert_message
+    from watchdog import EXIT_WATCHDOG, ConnectionWatchdog, write_marker
+
+    app, settings, routing = build_app()
+    threshold = env_seconds("A5B_WATCHDOG_SEC", 300.0)
+    interval = env_seconds("A5B_WATCHDOG_INTERVAL_SEC", 30.0)
+    logger.info(
+        "起動：観察用の遅延 %.1f 秒・接続の監視 %.0f 秒ごと／%.0f 秒切れたら終了",
+        simulated_delay(), interval, threshold,
+    )
+
+    handler = SocketModeHandler(app, settings.slack_app_token)
+    handler.connect()  # start() と違い、接続したら戻る。待つのは下の監視ループ
+    announce_previous_exit(app.client, routing.ops)
+
+    watchdog = ConnectionWatchdog(handler.client.is_connected, threshold)
+    while True:
+        time.sleep(interval)
+        down = watchdog.check()
+        if down is None:
+            continue
+        logger.error("Slack との接続が %.0f 秒切れたまま。終了して起動し直させる", down)
+        write_marker(down)  # 先に残す（Slack に送れなくても次の起動で伝えられるように）
+        post_to_ops(app.client, routing.ops, watchdog_alert_message(down))
+        logging.shutdown()
+        # sys.exit は他のスレッド（Socket Mode の受信）が残ると終わらないことがあるので、確実に終わらせる
+        os._exit(EXIT_WATCHDOG)
 
 
 if __name__ == "__main__":

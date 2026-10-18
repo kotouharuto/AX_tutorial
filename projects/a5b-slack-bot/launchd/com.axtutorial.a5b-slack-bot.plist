@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A-5b の Slack Bot を常駐させる（macOS / launchd）
+
+  【なぜ常駐の仕組みに任せるか】一晩動かした Bot が、プロセスは生きたまま
+  Slack との接続だけが壊れ続けていた（約7時間45分）。Bot 自身が接続を見張り、
+  切れ続けたら終了する（src/watchdog.py）。終了したら launchd が起動し直す。
+
+  【A-5a の launchd で踏んだことを避けている】
+  - uv を呼ばず、仮想環境の python を絶対パスで呼ぶ（launchd の PATH に ~/.local/bin が無い）
+  - プロジェクトは ~/dev に置く（~/Desktop は launchd から読めない・iCloud 同期の対象）
+  - 標準出力・標準エラー出力の行き先を必ず指定する（画面が無いので、無いと何も分からない）
+
+  配置：  ~/Library/LaunchAgents/com.axtutorial.a5b-slack-bot.plist
+  登録：  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.axtutorial.a5b-slack-bot.plist
+  解除：  launchctl bootout gui/$(id -u)/com.axtutorial.a5b-slack-bot
+  状態：  launchctl print gui/$(id -u)/com.axtutorial.a5b-slack-bot
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.axtutorial.a5b-slack-bot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/haruto/dev/ax_tutorial/projects/a5b-slack-bot/.venv/bin/python</string>
+        <string>/Users/haruto/dev/ax_tutorial/projects/a5b-slack-bot/src/app.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5b-slack-bot</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- ログインしたら起動する（Bot は常に待ち受けている必要がある）。
+         A-5a の定期実行とは違い、ここでは RunAtLoad を入れる -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 異常終了したときだけ起動し直す。監視による終了（終了コード 3）もここに入る。
+         正常終了（0）では起動し直さない（意図して止めたときに、勝手に戻らないように） -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- 起動し直す間隔の下限（秒）。ネットワークが切れている間に、
+         起動 → 失敗 → 起動 を短い間隔で繰り返さないため -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- 出力先のディレクトリは事前に作っておく（launchd が作るかは確かめていないため） -->
+    <key>StandardOutPath</key>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5b-slack-bot/output/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/haruto/dev/ax_tutorial/projects/a5b-slack-bot/output/launchd.err.log</string>
+</dict>
+</plist>

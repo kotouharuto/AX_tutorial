@@ -133,3 +133,20 @@ def ops_alert_message(
         {"type": "section", "text": {"type": "plain_text", "text": text[:2900] or "（本文なし）"}},
     ]
     return f"{kind}：{detail}", blocks
+
+
+def watchdog_alert_message(down_sec: float) -> str:
+    """接続が切れ続けて終了するときの、運用者への通知。"""
+    return (
+        f":rotating_light: Slack との接続が {down_sec:.0f} 秒切れたままのため、Bot を終了して起動し直します。"
+        "この間に送られた問い合わせは受け付けられていません。"
+    )
+
+
+def restart_notice_message(at: str, down_sec: float) -> str:
+    """起動し直したときの、運用者への通知（切れている間は送れないことがあるので、起動時に送る）。"""
+    seconds = f"{down_sec:.0f} 秒" if down_sec >= 0 else "不明な時間"
+    return (
+        f":information_source: 前回（{at}）、Slack との接続が {seconds}切れたため Bot を終了し、起動し直しました。"
+        "その間に「アプリが応答しなかった」と表示された問い合わせは受け付けられていません。"
+    )
