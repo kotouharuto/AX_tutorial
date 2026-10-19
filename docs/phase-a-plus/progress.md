@@ -968,5 +968,8 @@ manifest.yaml を実際の権限（`commands`・`chat:write`）に合わせた�
 
 ### 次にやること
 
-- A-5b のハマりポイントと作業ログ
-- 全ブロック終了後：`docs/phase-a-plus/summary.md`、`docs/phase-b-handover.md` 9章に追記
+- ~~A-5b のハマりポイントと作業ログ~~（2026-10-18 済）
+- ~~総括 `docs/phase-a-plus/summary.md`~~（2026-10-19 済）
+- ~~`docs/phase-b-handover.md` 9章に追記~~（2026-10-20 済）
+
+**追加ブロック（A-4〜A-6）はすべて終了。** この先の出品・価格・営業は Phase B（このリポジトリの範囲外）。
